@@ -39,6 +39,8 @@ public class ExtensionDependency
 				return new ExtensionDependency(Type.JAVA, "", new Version(s.substring("java-".length())));
 			case "stencyl":
 				return new ExtensionDependency(Type.STENCYL, "", new Version(s.substring("stencyl-".length())));
+			case "stencylbuild":
+				return new ExtensionDependency(Type.STENCYLBUILD, "", new ShortVersion(s.substring("stencylbuild-".length())));
 			case "engine":
 			case "toolset":
 				return new ExtensionDependency(Type.fromString(parts[0]), parts[1], new Version(parts[2]));
@@ -69,6 +71,8 @@ public class ExtensionDependency
 				return "Java " + version.getMinor();
 			case STENCYL:
 				return "Stencyl " + version;
+			case STENCYLBUILD:
+				return "Stencyl build " + version.getMajor();
 			case TOOLSET:
 				return "Toolset Extension " + id + " " + version;
 			case ENGINE:
@@ -88,6 +92,7 @@ public class ExtensionDependency
 	{
 		JAVA,
 		STENCYL,
+		STENCYLBUILD,
 		TOOLSET,
 		ENGINE,
 		HAXELIB;

@@ -20,6 +20,8 @@ public class NetRepoBackend extends RepoBackend
 {
 	private static final Logger log = Logger.getLogger(NetRepoBackend.class);
 	
+	private static final int HIGHEST_KNOWN_REPOSITORY_API_VERSION = 3;
+	
 	private String url;
 	private int apiVersion;
 	
@@ -73,9 +75,9 @@ public class NetRepoBackend extends RepoBackend
 			
 			return extensionList;
 		}
-		else if(apiVersion == 2)
+		else if(apiVersion == 2 || apiVersion == 3)
 		{
-			String info = dataFromUrl("%s/v2/%s/list.txt", url, type.toString());
+			String info = dataFromUrl("%s/v%d/%s/list.txt", url, apiVersion, type.toString());
 			return Arrays.asList(info.split("\\r?\\n"));
 		}
 		
@@ -90,22 +92,26 @@ public class NetRepoBackend extends RepoBackend
 		
 		JSONArray versions = o.getJSONArray("versions");
 		int highest = -1;
-		int highestAcceptable = 2;
 		for(Object version : versions)
 		{
 			int v = Integer.parseInt(((String) version).substring(1));
-			if(v > highest && v <= highestAcceptable)
+			if(v > highest && v <= HIGHEST_KNOWN_REPOSITORY_API_VERSION)
 				highest = v;
 		}
 		
 		return highest;
 	}
 	
+	public boolean isValid()
+	{
+		return apiVersion >= 1;
+	}
+	
 	public void downloadExtension(ExtensionType type, String id, Version version, File downloadTo, Runnable callback)
 	{
 		String downloadUrl = apiVersion == 1 ?
 			String.format("%s/v1/%s/%s/get/%s", url, type.toString(), id, version) :
-			String.format("%s/v2/%s/%s/%s.zip", url, type.toString(), id, version);
+			String.format("%s/v%d/%s/%s/%s.zip", url, apiVersion, type.toString(), id, version);
 		
 		downloadAll(Arrays.asList(new ImmutablePair<>(downloadUrl, downloadTo.getAbsolutePath())), callback);
 	}
@@ -125,9 +131,9 @@ public class NetRepoBackend extends RepoBackend
 				log.debug("No revision data for " + type.toString() + " extension " + extensionID);
 			}
 		}
-		if(apiVersion == 2)
+		if(apiVersion == 2 || apiVersion == 3)
 		{
-			String revisionString = dataFromUrl("%s/v2/%s/%s/revision", url, type.toString(), extensionID).trim();
+			String revisionString = dataFromUrl("%s/v%d/%s/%s/revision", url, apiVersion, type.toString(), extensionID).trim();
 			return Util.parseInt(revisionString, -1);
 		}
 		
@@ -140,9 +146,9 @@ public class NetRepoBackend extends RepoBackend
 		{
 			return String.format("%s/v1/%s/%s/get/icon", url, type.toString(), extensionID);
 		}
-		if(apiVersion == 2)
+		if(apiVersion == 2 || apiVersion == 3)
 		{
-			return String.format("%s/v2/%s/%s/icon.png", url, type.toString(), extensionID);
+			return String.format("%s/v%d/%s/%s/icon.png", url, apiVersion, type.toString(), extensionID);
 		}
 		
 		return null;
@@ -154,9 +160,9 @@ public class NetRepoBackend extends RepoBackend
 		{
 			return String.format("%s/v1/%s/%s/get/info", url, type.toString(), extensionID);
 		}
-		if(apiVersion == 2)
+		if(apiVersion == 2 || apiVersion == 3)
 		{
-			return String.format("%s/v2/%s/%s/info.txt", url, type.toString(), extensionID);
+			return String.format("%s/v%d/%s/%s/info.txt", url, apiVersion, type.toString(), extensionID);
 		}
 		
 		return null;
@@ -168,9 +174,9 @@ public class NetRepoBackend extends RepoBackend
 		{
 			return String.format("%s/v1/%s/%s/versions?format=json", url, type.toString(), extensionID);
 		}
-		if(apiVersion == 2)
+		if(apiVersion == 2 || apiVersion == 3)
 		{
-			return String.format("%s/v2/%s/%s/versions.json", url, type.toString(), extensionID);
+			return String.format("%s/v%d/%s/%s/versions.json", url, apiVersion, type.toString(), extensionID);
 		}
 		
 		return null;
