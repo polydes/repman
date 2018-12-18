@@ -26,20 +26,20 @@ public class NetRepoBackend extends RepoBackend
 	public NetRepoBackend(String url)
 	{
 		this.url = url;
+		
+		RepoBackend.quiet = true;
+		
 		apiVersion = getVersion();
+		if(apiVersion < 0)
+			log.warn(url + " doesn't point to a valid repository, or it can't be connected to.");
+		
+		RepoBackend.quiet = false;
 	}
 	
 	public static boolean verifyUrl(String url)
 	{
-		try
-		{
-			NetRepoBackend repo = new NetRepoBackend(url);
-			return repo.getVersion() > 0;
-		}
-		catch(Exception ex)
-		{
-			return false;
-		}
+		NetRepoBackend repo = new NetRepoBackend(url);
+		return repo.getVersion() > 0;
 	}
 	
 	/*-------------------------------------*\

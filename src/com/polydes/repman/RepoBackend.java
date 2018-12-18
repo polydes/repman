@@ -20,6 +20,7 @@ import org.json.JSONObject;
 public abstract class RepoBackend
 {
 	private static final Logger log = Logger.getLogger(RepoBackend.class);
+	protected static boolean quiet = false;
 	
 	/*-------------------------------------*\
 	 * Helpers
@@ -65,7 +66,8 @@ public abstract class RepoBackend
 		}
 		catch(IOException e)
 		{
-			log.error(e.getMessage(), e);
+			if(!quiet)
+				log.error(e.getMessage(), e);
 		}
 	}
 	
@@ -77,7 +79,8 @@ public abstract class RepoBackend
 		}
 		catch (IOException e)
 		{
-			log.error(e.getMessage(), e);
+			if(!quiet)
+				log.error(e.getMessage(), e);
 			return "";
 		}
 	}
@@ -91,7 +94,8 @@ public abstract class RepoBackend
 		}
 		catch(JSONException | IOException ex)
 		{
-			log.error(ex.getMessage(), ex);
+			if(!quiet)
+				log.error(ex.getMessage(), ex);
 			return null;
 		}
 	}
@@ -105,7 +109,8 @@ public abstract class RepoBackend
 		}
 		catch(JSONException ex)
 		{
-			log.error(ex.getMessage(), ex);
+			if(!quiet)
+				log.error(ex.getMessage(), ex);
 			return null;
 		}
 	}
