@@ -78,6 +78,7 @@ public class NetRepoBackend extends RepoBackend
 		else if(apiVersion == 2 || apiVersion == 3)
 		{
 			String info = dataFromUrl("%s/v%d/%s/list.txt", url, apiVersion, type.toString());
+			if(info.isBlank()) return new ArrayList<>();
 			return Arrays.asList(info.split("\\r?\\n"));
 		}
 		
