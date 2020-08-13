@@ -17,6 +17,8 @@ repositories:
    root: /var/www/html/repo
 ```
 
+`sftp` is specified in the example, but `ftp` and `ftps` are also supported.
+
 `sources.yml`: This file points to the location of extension source files on this computer, to enable easy building.
 
 ```yaml
