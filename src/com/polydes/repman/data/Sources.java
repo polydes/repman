@@ -38,10 +38,21 @@ import com.polydes.repman.util.io.XMLHelper;
 public class Sources
 {
 	public static final class SourceMap extends HashMap<String, String>{};
-	public static final class TypesMap extends HashMap<String, SourceMap>{};
+	public static final class TypesMap extends HashMap<ExtensionType, SourceMap>{};
 	public static final class ReposMap extends HashMap<String, TypesMap>{};
 	
-	public static ReposMap repos;
+	private static ReposMap repos;
+	
+	public static TypesMap getRepoSources(String url)
+	{
+		if(repos == null)
+			loadSources();
+		
+		if(repos == null)
+			return null;
+		
+		return repos.get(url);
+	}
 	
 	public static String getSource(Extension ext)
 	{
@@ -55,7 +66,7 @@ public class Sources
 		if(types == null)
 			return null;
 		
-		SourceMap sources = types.get(ext.type.toString());
+		SourceMap sources = types.get(ext.type);
 		if(sources == null)
 			return null;
 		
@@ -63,7 +74,7 @@ public class Sources
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public static void loadSources()
+	private static void loadSources()
 	{
 		repos = new ReposMap();
 		
@@ -81,14 +92,12 @@ public class Sources
 		    	
 		    	for(ExtensionType type : ExtensionType.values())
 		    	{
-		    		String typeAsString = type.toString();
-		    		
-		    		if(map.containsKey(typeAsString))
+		    		if(map.containsKey(type.toString()))
 			    	{
 			    		SourceMap sources = new SourceMap();
-			    		types.put(typeAsString, sources);
+			    		types.put(type, sources);
 			    		
-				    	for(Object entry : ((Map) map.get(typeAsString)).entrySet())
+				    	for(Object entry : ((Map) map.get(type.toString())).entrySet())
 				    	{
 				    		Entry<String,String> e = (Entry<String,String>) entry;
 				    		sources.put(e.getKey(), e.getValue());

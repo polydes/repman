@@ -1,5 +1,6 @@
 package com.polydes.repman;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -22,6 +24,9 @@ import org.json.JSONObject;
 import com.polydes.repman.ExtensionDependency.Type;
 import com.polydes.repman.ExtensionManifest.ExtensionCategory;
 import com.polydes.repman.data.Prefs;
+import com.polydes.repman.data.Sources;
+import com.polydes.repman.data.Sources.SourceMap;
+import com.polydes.repman.data.Sources.TypesMap;
 import com.polydes.repman.util.NotifierHashMap;
 import com.polydes.repman.util.Util;
 import com.polydes.repman.util.Zip;
@@ -57,7 +62,26 @@ public class LocalRepoBackend extends RepoBackend
 			extensionListDir.mkdirs();
 			for(String extensionID : extensionListDir.list())
 			{
-				loadExtension(type, extensionID);
+				if(new File(extensionListDir, extensionID + File.separator + "info.txt").exists())
+				{
+					loadExtension(type, extensionID);
+				}
+			}
+		}
+		
+		TypesMap types = Sources.getRepoSources(url);
+		for(Entry<ExtensionType, SourceMap> entry : types.entrySet())
+		{
+			ExtensionType type = entry.getKey();
+			SourceMap sources = entry.getValue();
+			Map<String, Extension> loadedExtensions = allExtensions.get(type);
+			
+			for(String extensionID : sources.keySet())
+			{
+				if(!loadedExtensions.containsKey(extensionID))
+				{
+					loadDummyExtension(type, extensionID);
+				}
 			}
 		}
 	}
@@ -162,6 +186,27 @@ public class LocalRepoBackend extends RepoBackend
 		
 		refreshInstalledVersions(ext);
 		
+		allExtensions.get(type).put(ext.id, ext);
+	}
+	
+	private void loadDummyExtension(ExtensionType type, String extensionID)
+	{
+		System.out.println("loading " + type + ", " + extensionID + " (dummy extension).");
+		
+		Extension ext = new Extension(type, extensionID);
+		ext.icon = new ImageIcon(new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB));
+		ext.name = "[" + extensionID + "]";
+		ext.author = "___";
+		ext.description = "___";
+		ext.website = "___";
+		ext.repository = url;
+		
+		if(type == ExtensionType.TOOLSET)
+		{
+			ext.cat = ExtensionCategory.NORMAL;
+		}
+		
+		ext.versions = new ArrayList<>();
 		allExtensions.get(type).put(ext.id, ext);
 	}
 
