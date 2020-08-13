@@ -37,24 +37,35 @@ import com.polydes.repman.util.io.XMLHelper;
 
 public class Sources
 {
-	public static Map<String, String> sources;
+	public static final class SourceMap extends HashMap<String, String>{};
+	public static final class TypesMap extends HashMap<String, SourceMap>{};
+	public static final class ReposMap extends HashMap<String, TypesMap>{};
+	
+	public static ReposMap repos;
 	
 	public static String getSource(Extension ext)
 	{
-		if(sources == null)
+		if(repos == null)
 			loadSources();
+		
+		if(repos == null)
+			return null;
+		
+		TypesMap types = repos.get(ext.repository);
+		if(types == null)
+			return null;
+		
+		SourceMap sources = types.get(ext.type.toString());
 		if(sources == null)
 			return null;
 		
-		String sourceKey = ext.repository + "::" + ext.type.toString() + "::" + ext.id;
-		
-		return sources.get(sourceKey);
+		return sources.get(ext.id);
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static void loadSources()
 	{
-		sources = new HashMap<>();
+		repos = new ReposMap();
 		
 		try
 		{
@@ -65,21 +76,23 @@ public class Sources
 		    	Map map = (Map) repo;
 		    	String url = (String) map.get("url");
 		    	
-		    	if(map.containsKey("engine"))
-		    	{
-			    	for(Object entry : ((Map) map.get("engine")).entrySet())
-			    	{
-			    		Entry<String,String> e = (Entry<String,String>) entry;
-			    		sources.put(url + "::engine::" + e.getKey(), e.getValue());
-			    	}
-		    	}
+		    	TypesMap types = new TypesMap();
+		    	repos.put(url, types);
 		    	
-		    	if(map.containsKey("toolset"))
+		    	for(ExtensionType type : ExtensionType.values())
 		    	{
-			    	for(Object entry : ((Map) map.get("toolset")).entrySet())
+		    		String typeAsString = type.toString();
+		    		
+		    		if(map.containsKey(typeAsString))
 			    	{
-			    		Entry<String,String> e = (Entry<String,String>) entry;
-			    		sources.put(url + "::toolset::" + e.getKey(), e.getValue());
+			    		SourceMap sources = new SourceMap();
+			    		types.put(typeAsString, sources);
+			    		
+				    	for(Object entry : ((Map) map.get(typeAsString)).entrySet())
+				    	{
+				    		Entry<String,String> e = (Entry<String,String>) entry;
+				    		sources.put(e.getKey(), e.getValue());
+				    	}
 			    	}
 		    	}
 		    }
@@ -87,7 +100,7 @@ public class Sources
 		catch(FileNotFoundException | YamlException e)
 		{
 			e.printStackTrace();
-			sources = null;
+			repos = null;
 		}
 	}
 	
