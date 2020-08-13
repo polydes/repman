@@ -19,7 +19,7 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.polydes.repman.ui;
+package com.polydes.repman.ui.comp;
 
 import java.awt.Color;
 import java.awt.Graphics;

@@ -13,6 +13,7 @@ import org.apache.log4j.xml.DOMConfigurator;
 
 import com.polydes.repman.ExtensionRepositoryManager;
 import com.polydes.repman.data.Prefs;
+import com.polydes.repman.ui.comp.MiniSplitPane;
 import com.polydes.repman.util.Util;
 
 public class RepmanMain extends JFrame
