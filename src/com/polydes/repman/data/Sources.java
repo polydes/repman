@@ -222,6 +222,7 @@ public class Sources
 			}
 			
 			File dest = RepmanMain.instance.getErm().getRepositories().get(ext.repository).getVersionLocalLocation(ext, version);
+			dest.getParentFile().mkdirs();
 			Zip.zip(outJar, dest);
 		}
 		
