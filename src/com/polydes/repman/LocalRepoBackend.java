@@ -45,6 +45,21 @@ public class LocalRepoBackend extends RepoBackend
 		allExtensions = new HashMap<>();
 		allExtensions.put(ExtensionType.ENGINE, new NotifierHashMap<>());
 		allExtensions.put(ExtensionType.TOOLSET, new NotifierHashMap<>());
+		
+		loadFromDisk();
+	}
+	
+	public void loadFromDisk()
+	{
+		for(ExtensionType type : allExtensions.keySet())
+		{
+			File extensionListDir = new File(root, type.toString());
+			extensionListDir.mkdirs();
+			for(String extensionID : extensionListDir.list())
+			{
+				loadExtension(type, extensionID);
+			}
+		}
 	}
 
 	public void update(NetRepoBackend netRepo)
@@ -73,11 +88,7 @@ public class LocalRepoBackend extends RepoBackend
 				
 				currentNetVersion = netRepo.getRevision(type, extensionID);
 				
-				if(currentLocalVersion == currentNetVersion && currentLocalVersion != -1)
-				{
-					loadExtension(type, extensionID);
-				}
-				else
+				if(currentNetVersion > currentLocalVersion)
 				{
 					final String revString = "" + currentNetVersion;
 					
