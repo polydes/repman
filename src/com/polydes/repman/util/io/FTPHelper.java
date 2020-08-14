@@ -1,6 +1,4 @@
 package com.polydes.repman.util.io;
-import com.jcraft.jsch.*;
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -15,6 +13,13 @@ import org.apache.commons.net.ftp.FTPClientConfig;
 import org.apache.commons.net.ftp.FTPConnectionClosedException;
 import org.apache.commons.net.ftp.FTPReply;
 import org.apache.commons.net.ftp.FTPSClient;
+
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpException;
 
 public class FTPHelper
 {
@@ -112,7 +117,7 @@ public class FTPHelper
 			}
 		}
 	}
-
+	
 	public void disconnect()
 	{
 		if(isSFTP())
@@ -135,17 +140,103 @@ public class FTPHelper
 			}
 		}
 	}
-
-	public void transfer(boolean storeFile, boolean binaryTransfer, String remote, String local)
+	
+	private boolean ensureFolderExists(String remote)
+	{
+		int lastSeparator = remote.indexOf("/");
+		while(lastSeparator != -1)
+		{
+			if(lastSeparator != 0)
+			{
+				if(!ensureSingleFolderExists(remote.substring(0, lastSeparator)))
+					break;
+			}
+			lastSeparator = remote.indexOf("/", lastSeparator + 1);
+		}
+		
+		return ensureSingleFolderExists(remote);
+	}
+	
+	private boolean ensureSingleFolderExists(String remote)
 	{
 		if(isSFTP())
 		{
 			try
 			{
+				sftpChannel.cd(remote);
+			}
+			catch(SftpException e)
+			{
+				try
+				{
+					int separator = remote.lastIndexOf("/");
+					sftpChannel.cd(remote.substring(0, separator));
+					sftpChannel.mkdir(remote.substring(separator + 1));
+				}
+				catch(SftpException e1)
+				{
+					e1.printStackTrace();
+				}
+				
+				try
+				{
+					sftpChannel.cd(remote);
+				}
+				catch(SftpException e1)
+				{
+					e1.printStackTrace();
+					return false;
+				}
+				
+				System.out.println("Created remote folder: " + remote);
+			}
+		}
+		else
+		{
+			try
+			{
+				boolean existed = ftp.changeWorkingDirectory(remote);
+				if(!existed)
+				{
+					int separator = remote.lastIndexOf("/");
+					ftp.changeWorkingDirectory(remote.substring(0, separator));
+					ftp.makeDirectory(remote.substring(separator + 1));
+					
+					if(!ftp.changeWorkingDirectory(remote))
+						return false;
+					
+					System.out.println("Created remote folder: " + remote);
+				}
+			}
+			catch(IOException ioe)
+			{
+				ioe.printStackTrace();
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
+	public void transfer(boolean storeFile, boolean binaryTransfer, String remote, String local)
+	{
+		String remoteFolder = remote.substring(0, remote.lastIndexOf("/"));
+		
+		if(isSFTP())
+		{
+			try
+			{
 				if(storeFile)
+				{
+					ensureFolderExists(remoteFolder);
 					sftpChannel.put(local, remote);
+					System.out.println("Uploaded file to " + remote);
+				}
 				else
+				{
 					sftpChannel.get(remote, local);
+					System.out.println("Downloaded file from " + remote);
+				}
 			}
 			catch(SftpException e)
 			{
@@ -164,6 +255,8 @@ public class FTPHelper
 	
 				System.out.println("Remote system is " + ftp.getSystemType());
 	
+				ensureFolderExists(remoteFolder);
+				
 				if(binaryTransfer)
 				{
 					ftp.setFileType(FTP.BINARY_FILE_TYPE);
@@ -180,6 +273,7 @@ public class FTPHelper
 					try(InputStream input = new FileInputStream(local))
 					{
 						ftp.storeFile(remote, input);
+						System.out.println("Uploaded file to " + remote);
 					}
 				}
 				else
@@ -187,6 +281,7 @@ public class FTPHelper
 					try(OutputStream output = new FileOutputStream(local))
 					{
 						ftp.retrieveFile(remote, output);
+						System.out.println("Downloaded file from " + remote);
 					}
 				}
 	
