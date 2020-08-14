@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.util.HashSet;
 
 import org.apache.commons.net.PrintCommandListener;
 import org.apache.commons.net.ftp.FTP;
@@ -36,6 +37,9 @@ public class FTPHelper
 	JSch jsch;
 	Session session;
 	ChannelSftp sftpChannel;
+	
+	//cache for performance
+	HashSet<String> confirmedFolders = new HashSet<>();
 	
 	public enum FTPConnectionType
 	{
@@ -143,6 +147,8 @@ public class FTPHelper
 	
 	private boolean ensureFolderExists(String remote)
 	{
+		if(doesSingleFolderExist(remote)) return true;
+		
 		int lastSeparator = remote.indexOf("/");
 		while(lastSeparator != -1)
 		{
@@ -157,8 +163,48 @@ public class FTPHelper
 		return ensureSingleFolderExists(remote);
 	}
 	
+	private boolean doesSingleFolderExist(String remote)
+	{
+		if(confirmedFolders.contains(remote)) return true;
+		
+		if(isSFTP())
+		{
+			try
+			{
+				sftpChannel.cd(remote);
+				confirmedFolders.add(remote);
+				return true;
+			}
+			catch(SftpException e)
+			{
+				return false;
+			}
+		}
+		else
+		{
+			try
+			{
+				if(ftp.changeWorkingDirectory(remote))
+				{
+					confirmedFolders.add(remote);
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+			catch(IOException e)
+			{
+				return false;
+			}
+		}
+	}
+	
 	private boolean ensureSingleFolderExists(String remote)
 	{
+		if(confirmedFolders.contains(remote)) return true;
+		
 		if(isSFTP())
 		{
 			try
@@ -215,6 +261,7 @@ public class FTPHelper
 			}
 		}
 		
+		confirmedFolders.add(remote);
 		return true;
 	}
 
