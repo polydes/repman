@@ -492,7 +492,47 @@ public class Version implements Comparable<Version>
 		{
 			return result;
 		}
+		
+		//1.0.0-b10639 < 1.0.0-b10640 < 1.0.0 
+		if(qualifier.isEmpty() != other.qualifier.isEmpty())
+		{
+			return qualifier.isEmpty() ? 1 : -1;
+		}
 
 		return qualifier.compareTo(other.qualifier);
+	}
+	
+	public boolean satisfies(Version other)
+	{
+		if (other == this)
+		{ // quicktest
+			return true;
+		}
+		
+		int result = major - other.major;
+		if (result != 0)
+		{
+			return result > 0;
+		}
+
+		result = minor - other.minor;
+		if (result != 0)
+		{
+			return result > 0;
+		}
+
+		result = micro - other.micro;
+		if (result != 0)
+		{
+			return result > 0;
+		}
+		
+		//1.0.0-b10639 < 1.0.0-b10640 < 1.0.0, but all satisfy 1.0.0
+		if(qualifier.isEmpty() != other.qualifier.isEmpty())
+		{
+			return true;
+		}
+
+		return qualifier.compareTo(other.qualifier) >= 0;
 	}
 }

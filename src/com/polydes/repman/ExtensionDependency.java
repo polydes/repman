@@ -60,7 +60,7 @@ public class ExtensionDependency
 	
 	public boolean meetsDependency(ExtensionDependency dep)
 	{
-		return type == dep.type && id.equals(dep.id) && version.compareTo(dep.version) >= 0;
+		return type == dep.type && id.equals(dep.id) && version.satisfies(dep.version);
 	}
 	
 	public String getSimpleName()
