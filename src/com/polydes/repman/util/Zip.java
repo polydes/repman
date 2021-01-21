@@ -1,5 +1,7 @@
 package com.polydes.repman.util;
 
+import static com.polydes.repman.util.ProcessUtils.runCommand;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,6 +12,8 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -27,21 +31,33 @@ public class Zip
 	{
 		System.out.println("> zip " + source.getAbsolutePath() + " " + destination.getAbsolutePath());
 		
+		Collection<File> fileList = null;
+		if(source.isDirectory())
+		{
+			if(new File(source, ".git").exists())
+			{
+				final File projectRoot = source;
+				String output = runCommand(source, "git", new String[] {"ls-tree", "-r", "HEAD", "--name-only"});
+				fileList = Stream
+					.of(output.split("(\r\n|\r|\n)"))
+					.map(filepath -> new File(projectRoot, filepath))
+					.collect(Collectors.toList());
+			}
+			else
+			{
+				fileList = FileUtils.listFiles(source, null, true);
+			}
+		}
+		else
+		{
+			fileList = Arrays.asList(source);
+			source = source.getParentFile();
+		}
+		
 		try(ZipOutputStream zipFile = new ZipOutputStream(destination))
 		{
 			try
 			{
-				Collection<File> fileList = null;
-				if(source.isDirectory())
-				{
-					fileList = FileUtils.listFiles(source, null, true);
-				}
-				else
-				{
-					fileList = Arrays.asList(source);
-					source = source.getParentFile();
-				}
-				
 				for (File file : fileList)
 				{
 					String entryName = getEntryName(source, file);

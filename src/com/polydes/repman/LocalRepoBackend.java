@@ -235,6 +235,11 @@ public class LocalRepoBackend extends RepoBackend
 		
 		if(isEngine)
 		{
+			if(new File(installed, ".git").exists())
+			{
+				System.out.println("Can't delete git project -- " + installed.getAbsolutePath());
+				return;
+			}
 			try
 			{
 				FileUtils.deleteDirectory(installed);
