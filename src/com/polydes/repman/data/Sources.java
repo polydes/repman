@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -31,6 +32,7 @@ import com.polydes.repman.LocalRepoBackend.ExtensionVersion;
 import com.polydes.repman.Version;
 import com.polydes.repman.ui.RepmanMain;
 import com.polydes.repman.util.AntExecutor;
+import com.polydes.repman.util.ProcessUtils;
 import com.polydes.repman.util.Zip;
 import com.polydes.repman.util.io.IterableNodeList;
 import com.polydes.repman.util.io.XMLHelper;
@@ -159,21 +161,35 @@ public class Sources
 		}
 		else
 		{
-			try
+			if(new File(sourceFile, "version.txt").exists())
 			{
-				//XXX: For now this only works with polydes extensions
-				
-				File buildFile = new File(sourceFile, "build.xml");
-				Document doc = XMLHelper.readXMLFromFile(buildFile);
-				for(Element e : IterableNodeList.elements(doc.getDocumentElement().getElementsByTagName("property")))
+				try
 				{
-					if(e.getAttribute("name").equals("version"))
-						version = new Version(e.getAttribute("value"));
+					version = new Version(Files.readString(new File(sourceFile, "version.txt").toPath()));
+				}
+				catch(IOException e)
+				{
+					throw new Exception("Failed to read build.xml", e);
 				}
 			}
-			catch(IOException e)
+			if(new File(sourceFile, "build.xml").exists())
 			{
-				throw new Exception("Failed to read build.xml", e);
+				try
+				{
+					//XXX: For now this only works with polydes extensions
+					
+					File buildFile = new File(sourceFile, "build.xml");
+					Document doc = XMLHelper.readXMLFromFile(buildFile);
+					for(Element e : IterableNodeList.elements(doc.getDocumentElement().getElementsByTagName("property")))
+					{
+						if(e.getAttribute("name").equals("version"))
+							version = new Version(e.getAttribute("value"));
+					}
+				}
+				catch(IOException e)
+				{
+					throw new Exception("Failed to read build.xml", e);
+				}
 			}
 		}
 		
@@ -194,10 +210,22 @@ public class Sources
 		}
 		else
 		{
+			String gradleWrapper = "gradlew";
+			if(System.getProperty("os.name").startsWith("Windows")) {
+				gradleWrapper = "gradlew.bat";
+			}
 			//build jar
 			File buildFile = new File(sourceFile, "build.xml");
-			
-			boolean success = AntExecutor.executeAntTask(buildFile.getAbsolutePath());
+			boolean success = false;
+			if(buildFile.exists())
+			{
+				success = AntExecutor.executeAntTask(buildFile.getAbsolutePath());
+			}
+			else if(new File(sourceFile, gradleWrapper).exists())
+			{
+				String[] args = new String[] {new File(sourceFile, gradleWrapper).getAbsolutePath(), "installToolsetToWorkspace"};
+				success = ProcessUtils.runCommandResult(sourceFile, args) == 0;
+			}
 			if(!success)
 			{
 				throw new Exception("Failed to build .jar");

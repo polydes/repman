@@ -7,17 +7,6 @@ import java.io.InputStreamReader;
 
 public class ProcessUtils
 {
-	public static String runCommand(File workingDir, String command, String... args)
-	{
-		String[] commands = new String[args.length + 1];
-		
-		commands[0] = command;
-		for(int i = 0; i < args.length; ++i)
-			commands[i + 1] = args[i];
-		
-		return runCommand(workingDir, commands);
-	}
-	
 	public static String runCommand(File workingDir, String... commands)
 	{
 		Runtime rt = Runtime.getRuntime();
@@ -52,5 +41,21 @@ public class ProcessUtils
 		}
 		
 		return null;
+	}
+	
+	public static int runCommandResult(File workingDir, String... commands) throws IOException
+	{
+		ProcessBuilder pb = new ProcessBuilder(commands);
+		pb.directory(workingDir);
+		pb.inheritIO();
+		Process p = pb.start();
+		try
+		{
+			return p.waitFor();
+		}
+		catch (InterruptedException e)
+		{
+			return -1;
+		}
 	}
 }

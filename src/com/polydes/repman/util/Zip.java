@@ -37,7 +37,7 @@ public class Zip
 			if(new File(source, ".git").exists())
 			{
 				final File projectRoot = source;
-				String output = runCommand(source, "git", new String[] {"ls-tree", "-r", "HEAD", "--name-only"});
+				String output = runCommand(source, new String[] {"git", "ls-tree", "-r", "HEAD", "--name-only"});
 				fileList = Stream
 					.of(output.split("(\r\n|\r|\n)"))
 					.map(filepath -> new File(projectRoot, filepath))
