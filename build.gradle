@@ -1,0 +1,48 @@
+plugins {
+    id 'eclipse'
+    id 'application'
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(16))
+    }
+}
+
+group = 'com.polydes'
+version = '0.0.1'
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://www.stencyl.com/dl/maven2/releases"
+    }
+    maven {
+        url "https://www.stencyl.com/dl/maven2/snapshots"
+    }
+}
+
+dependencies {
+    //Stencyl and its dependencies
+    implementation enforcedPlatform('com.stencyl:stencyl-platform:4.1.0-SNAPSHOT')
+    implementation group: 'org.apache.commons',             name: 'commons-lang3'
+    implementation group: 'log4j',                          name: 'log4j'
+    implementation group: 'commons-io',                     name: 'commons-io'
+    implementation group: 'org.json',                       name: 'json'
+    implementation group: 'com.esotericsoftware.yamlbeans', name: 'yamlbeans'
+    implementation group: 'com.jcraft',                     name: 'jsch',         version: '0.1.53'
+    implementation group: 'commons-net',                    name: 'commons-net',  version: '3.4'
+    implementation group: 'org.apache.ant',                 name: 'ant',          version: '1.9.2'
+}
+
+application {
+    mainClass = "com.polydes.repman.ui.RepmanMain"
+}
