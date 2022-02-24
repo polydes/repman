@@ -3,7 +3,6 @@ package com.polydes.repman.ui.comp;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -61,30 +60,7 @@ public class MultiLineCellSupport extends AbstractCellEditor implements TableCel
 			stringTransformers = peer.stringTransformers;
 		}
 		
-		jtextarea = new JTextArea()
-		{
-			@Override
-			protected void paintBorder(Graphics g)
-			{
-//				Border b = getBorder();
-//				if(b instanceof LineBorder)
-//				{
-//					int width = getWidth();
-//					int height = getHeight();
-//					LineBorder lb = (LineBorder) b;
-//					
-//					Shape clip = g.getClip();
-//					g.setClip(null);
-//					
-//					lb.paintBorder(this, g, 0, 0, width, height);
-//					lb.paintBorder(this, g, -1, -1, width+2, height+2);
-//					
-//					g.setClip(clip);
-//				}
-//				else
-					super.paintBorder(g);
-			}
-		};
+		jtextarea = new JTextArea();
 		jtextarea.setLineWrap(true);
 		jtextarea.setWrapStyleWord(true);
 		jtextarea.setOpaque(true);

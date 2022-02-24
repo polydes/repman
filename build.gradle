@@ -7,6 +7,8 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(16))
     }
+    //XXX: https://github.com/gradle/gradle/issues/16922
+    modularity.inferModulePath = false
 }
 
 group = 'com.polydes'
@@ -41,6 +43,7 @@ dependencies {
     implementation group: 'com.jcraft',                     name: 'jsch',         version: '0.1.53'
     implementation group: 'commons-net',                    name: 'commons-net',  version: '3.4'
     implementation group: 'org.apache.ant',                 name: 'ant',          version: '1.9.2'
+    implementation group: 'com.formdev',                    name: 'flatlaf',      version: '2.0.1'
 }
 
 application {

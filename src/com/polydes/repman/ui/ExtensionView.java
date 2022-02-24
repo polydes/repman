@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
@@ -30,8 +29,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
-import javax.swing.UIManager;
-import javax.swing.border.Border;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -269,8 +266,6 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		versionTable.getTableHeader().getColumnModel().getColumn(5).setMaxWidth(20);
 		versionTable.getTableHeader().getColumnModel().getColumn(6).setMaxWidth(20);
 		
-		versionTable.setGridColor(new Color(0x999999));
-		
 		add(new JScrollPane(versionTable), BorderLayout.CENTER);
 		
 		revalidate();
@@ -390,27 +385,12 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 	
 	class ExtensionVersionCellColorProvider implements CellColorProvider
 	{
-		private Border noFocusBorder;
-		private Border localFocusBorder;
-		private Border dirtyFocusBorder;
-		
 		Color localColor = new Color(0xB8EDB4);
 		Color dirtyColor = new Color(0xEACCB2);
+		Color alternateColor = new Color(0xCEDDE5);
 		
 		public ExtensionVersionCellColorProvider()
 		{
-			//XXX
-			Border focusBorder = UIManager.getBorder("Table.focusCellHighlightBorder");
-			if(focusBorder != null)
-			{
-				Map<String, Object> props = Util.getProps(focusBorder, "thickness");
-				int thickness = (Integer) props.get("thickness");
-//				Color color = (Color) props.get("color");
-				
-				noFocusBorder = BorderFactory.createEmptyBorder(thickness, thickness, thickness, thickness);
-				localFocusBorder = BorderFactory.createLineBorder(new Color(0x85C685), thickness);
-				dirtyFocusBorder = BorderFactory.createLineBorder(new Color(0xE2A87F), thickness);
-			}
 		}
 		
 		@Override
@@ -426,27 +406,20 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			else
 			{
 				c.setForeground(table.getForeground());
-				c.setBackground(table.getBackground());
+				if(row % 2 == 0)
+				{
+					c.setBackground(table.getBackground());
+				}
+				else
+				{
+					c.setBackground(new Color(0xEDF5F9));
+				}
 			}
 			
 			if(ev.local)
 				c.setBackground(localColor);
 			else if(ev.dirty)
 				c.setBackground(dirtyColor);
-			
-			if(hasFocus)
-			{
-				if(ev.local)
-					c.setBorder(localFocusBorder);
-				else if(ev.dirty)
-					c.setBorder(dirtyFocusBorder);
-				else
-					c.setBorder(UIManager.getBorder("Table.focusCellHighlightBorder"));
-			}
-			else
-			{
-				c.setBorder(noFocusBorder);
-			}
 		}
 	}
 	

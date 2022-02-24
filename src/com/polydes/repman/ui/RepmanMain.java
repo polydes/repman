@@ -1,6 +1,7 @@
 package com.polydes.repman.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.util.Map;
@@ -8,9 +9,11 @@ import java.util.Map;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.SwingWorker;
+import javax.swing.UIManager;
 
 import org.apache.log4j.xml.DOMConfigurator;
 
+import com.formdev.flatlaf.FlatLightLaf;
 import com.polydes.repman.ExtensionRepositoryManager;
 import com.polydes.repman.data.Prefs;
 import com.polydes.repman.ui.comp.MiniSplitPane;
@@ -21,6 +24,10 @@ public class RepmanMain extends JFrame
 	public static void main(String[] args)
 	{
 		DOMConfigurator.configure("log4j.xml");
+		FlatLightLaf.setup();
+		UIManager.put("Table.showVerticalLines", true);
+		UIManager.put("Table.showHorizontalLines", true);
+		UIManager.put("Table.intercellSpacing", new Dimension(1, 1));
 		new RepmanMain();
 	}
 	
