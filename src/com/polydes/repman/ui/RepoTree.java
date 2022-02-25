@@ -27,13 +27,18 @@ public class RepoTree extends JPanel
 	Map<Extension, DefaultMutableTreeNode> extNodeMap;
 	RepoListener repoListener;
 	
+	DefaultMutableTreeNode repositoriesRoot;
 	public RepoTree()
 	{
 		super(new BorderLayout());
 		
-		root = new DefaultMutableTreeNode("Repositories");
+		root = new DefaultMutableTreeNode("Root");
+		root.add(repositoriesRoot = new DefaultMutableTreeNode("Repositories"));
+		
 		model = new DefaultTreeModel(root);
 		tree = new JTree(model);
+		tree.setRootVisible(false);
+		tree.setShowsRootHandles(true);
 		repoNodeMap = new HashMap<>();
 		extNodeMap = new HashMap<>();
 		repoListener = new RepoListener();
@@ -66,8 +71,8 @@ public class RepoTree extends JPanel
 					repoNodeMap.put(repo, node);
 					ExtensionListener engineListener = new ExtensionListener(engine);
 					ExtensionListener toolsetListener = new ExtensionListener(toolset);
-					root.add(node);
-					model.nodeStructureChanged(root);
+					repositoriesRoot.add(node);
+					model.nodeStructureChanged(repositoriesRoot);
 					repo.getExtensions(ExtensionType.ENGINE).addListener(engineListener);
 					repo.getExtensions(ExtensionType.TOOLSET).addListener(toolsetListener);
 					lmap.put(repo, new ImmutablePair<>(engineListener, toolsetListener));
@@ -79,8 +84,8 @@ public class RepoTree extends JPanel
 				case VALUE_REMOVED:
 					node = repoNodeMap.remove(repo);
 					node.removeAllChildren();
-					root.remove(node);
-					model.nodeStructureChanged(root);
+					repositoriesRoot.remove(node);
+					model.nodeStructureChanged(repositoriesRoot);
 					for(Extension ext : repo.getExtensions(ExtensionType.ENGINE).values())
 						removeExtension(ext);
 					for(Extension ext : repo.getExtensions(ExtensionType.TOOLSET).values())
