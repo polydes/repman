@@ -18,7 +18,7 @@ public class ExtensionRepository
 		
 		netBackend = new NetRepoBackend(url);
 		
-		String local = url.replace("http://", "");
+		String local = url.replace("http://", "").replace("https://", "");
 		
 		localBackend = new LocalRepoBackend(url, local);
 		
