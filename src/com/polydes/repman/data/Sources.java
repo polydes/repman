@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
 
 import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
@@ -32,7 +33,6 @@ import com.polydes.repman.LocalRepoBackend.ExtensionVersion;
 import com.polydes.repman.Version;
 import com.polydes.repman.ui.RepmanMain;
 import com.polydes.repman.util.AntExecutor;
-import com.polydes.repman.util.ProcessUtils;
 import com.polydes.repman.util.Zip;
 import com.polydes.repman.util.io.IterableNodeList;
 import com.polydes.repman.util.io.XMLHelper;
@@ -223,8 +223,20 @@ public class Sources
 			}
 			else if(new File(sourceFile, gradleWrapper).exists())
 			{
-				String[] args = new String[] {new File(sourceFile, gradleWrapper).getAbsolutePath(), "installToolsetToWorkspace"};
-				success = ProcessUtils.runCommandResult(sourceFile, args) == 0;
+				//String[] args = new String[] {new File(sourceFile, gradleWrapper).getAbsolutePath(), "installToolsetToWorkspace"};
+				//success = ProcessUtils.runCommandResult(sourceFile, args) == 0;
+				File outJar = new File(Prefs.get(Prefs.SW_WORKSPACE) + "extensions" + File.separator + ext.id + ".jar");
+				outJar.delete();
+				JOptionPane.showMessageDialog(RepmanMain.instance, "Build the new extension version manually, and then continue", "Build extension", JOptionPane.PLAIN_MESSAGE);
+				try
+				{
+					ExtensionManifest man = ExtensionManifest.fromJar(outJar);
+					success = man.version.equals(version);
+				}
+				catch(IOException e)
+				{
+					throw new Exception("Failed to read .jar manifest.");
+				} 
 			}
 			if(!success)
 			{
