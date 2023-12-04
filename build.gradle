@@ -5,10 +5,8 @@ plugins {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(16))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
-    //XXX: https://github.com/gradle/gradle/issues/16922
-    modularity.inferModulePath = false
 }
 
 group = 'com.polydes'
