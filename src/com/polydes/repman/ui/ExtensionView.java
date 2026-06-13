@@ -9,6 +9,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.text.DateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -261,7 +264,8 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		
 //		resizeColumnWidth(versionTable);
 		versionTable.getTableHeader().getColumnModel().getColumn(0).setMaxWidth(60);
-		versionTable.getTableHeader().getColumnModel().getColumn(1).setMaxWidth(80);
+		versionTable.getTableHeader().getColumnModel().getColumn(1).setMaxWidth(95);
+		versionTable.getTableHeader().getColumnModel().getColumn(1).setMinWidth(95);
 		versionTable.getTableHeader().getColumnModel().getColumn(4).setMaxWidth(20);
 		versionTable.getTableHeader().getColumnModel().getColumn(5).setMaxWidth(20);
 		versionTable.getTableHeader().getColumnModel().getColumn(6).setMaxWidth(20);
@@ -287,6 +291,14 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			columnModel.getColumn(column).setPreferredWidth(width);
 		}
 	}
+
+	private static DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+	private static String toIsoDate(String input)
+	{
+		LocalDate date = LocalDate.parse(input, inputFormat);
+		return date.format(DateTimeFormatter.ISO_DATE);
+	}
+
 	
 	public class VersionTableModel extends DefaultTableModel
 	{
@@ -329,7 +341,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			switch(column)
 			{
 				case 0: return v.version;
-				case 1: return v.date;
+				case 1: return toIsoDate(v.date);
 				case 2: return v.changes;
 				case 3: return v.dependencies;
 				case 4: return hasLocal(v) ? LocalDownloadState.Delete : LocalDownloadState.Download;
