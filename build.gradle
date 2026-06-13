@@ -5,7 +5,7 @@ plugins {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -35,16 +35,17 @@ repositories {
 
 dependencies {
     //Stencyl and its dependencies
-    implementation enforcedPlatform('com.stencyl:stencyl-platform:4.1.0-SNAPSHOT')
+    implementation enforcedPlatform('com.stencyl:stencyl-platform:4.2.0')
     implementation group: 'org.apache.commons',             name: 'commons-lang3'
     implementation group: 'log4j',                          name: 'log4j'
     implementation group: 'commons-io',                     name: 'commons-io'
     implementation group: 'org.json',                       name: 'json'
     implementation group: 'com.esotericsoftware.yamlbeans', name: 'yamlbeans'
+    implementation group: 'com.stencyl',                    name: 'filetree-indexer'
+    implementation group: 'com.formdev',                    name: 'flatlaf'
     implementation group: 'com.jcraft',                     name: 'jsch',         version: '0.1.53'
     implementation group: 'commons-net',                    name: 'commons-net',  version: '3.4'
     implementation group: 'org.apache.ant',                 name: 'ant',          version: '1.9.2'
-    implementation group: 'com.formdev',                    name: 'flatlaf',      version: '2.0.1'
 }
 
 application {
