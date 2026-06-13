@@ -1,9 +1,10 @@
 /.classpath
 /.project
-/.gradle
-/.settings
-/build
-bin
-prefs.txt
-repositories.yml
-sources.yml
+/.idea/
+/.gradle/
+/.settings/
+/build/
+/bin/
+/prefs.txt
+/repositories.yml
+/sources.yml
