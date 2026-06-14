@@ -45,7 +45,6 @@ dependencies {
     implementation group: 'com.formdev',                    name: 'flatlaf'
     implementation group: 'com.jcraft',                     name: 'jsch',         version: '0.1.53'
     implementation group: 'commons-net',                    name: 'commons-net',  version: '3.4'
-    implementation group: 'org.apache.ant',                 name: 'ant',          version: '1.9.2'
 }
 
 application {

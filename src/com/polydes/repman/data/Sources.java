@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -14,14 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Consumer;
 
-import javax.imageio.ImageIO;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.JOptionPane;
-
-import org.apache.commons.io.FileUtils;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 
 import com.esotericsoftware.yamlbeans.YamlException;
 import com.esotericsoftware.yamlbeans.YamlReader;
@@ -32,10 +24,7 @@ import com.polydes.repman.ExtensionType;
 import com.polydes.repman.LocalRepoBackend.ExtensionVersion;
 import com.polydes.repman.Version;
 import com.polydes.repman.ui.RepmanMain;
-import com.polydes.repman.util.AntExecutor;
 import com.polydes.repman.util.Zip;
-import com.polydes.repman.util.io.IterableNodeList;
-import com.polydes.repman.util.io.XMLHelper;
 
 public class Sources
 {
@@ -131,67 +120,7 @@ public class Sources
 		String website = "";
 		Icon icon = null;
 		
-		if(ext.type == ExtensionType.ENGINE)
-		{
-			try
-			{
-				List<String> info = FileUtils.readLines(new File(sourceFile, "info.txt"));
-				Map<String,String> map = new HashMap<>();
-				Prefs.putLinesInMap(info, map);
-				version = new Version(map.get("version"));
-				deps = ExtensionDependency.fromStringList(map.get("dependencies"), ExtensionDependency.Type.ENGINE);
-				
-				name = map.get("name");
-				description = map.get("description");
-				author = map.get("author");
-				website = map.get("website");
-			}
-			catch(IOException e)
-			{
-				throw new Exception("Failed to read info.txt.", e);
-			}
-			try
-			{
-				icon = new ImageIcon(ImageIO.read(new File(sourceFile, "icon.png")));
-			}
-			catch(IOException e)
-			{
-				throw new Exception("Failed to read icon.png.", e);
-			}
-		}
-		else
-		{
-			if(new File(sourceFile, "version.txt").exists())
-			{
-				try
-				{
-					version = new Version(Files.readString(new File(sourceFile, "version.txt").toPath()));
-				}
-				catch(IOException e)
-				{
-					throw new Exception("Failed to read build.xml", e);
-				}
-			}
-			if(new File(sourceFile, "build.xml").exists())
-			{
-				try
-				{
-					//XXX: For now this only works with polydes extensions
-					
-					File buildFile = new File(sourceFile, "build.xml");
-					Document doc = XMLHelper.readXMLFromFile(buildFile);
-					for(Element e : IterableNodeList.elements(doc.getDocumentElement().getElementsByTagName("property")))
-					{
-						if(e.getAttribute("name").equals("version"))
-							version = new Version(e.getAttribute("value"));
-					}
-				}
-				catch(IOException e)
-				{
-					throw new Exception("Failed to read build.xml", e);
-				}
-			}
-		}
+		//TODO: READ EXTENSION INFO
 		
 		for(ExtensionVersion v : ext.versions)
 		{
@@ -200,7 +129,8 @@ public class Sources
 				throw new Exception("Can't build a version that already exists (" + v.version + ").");
 			}
 		}
-		
+
+		//TODO: whether to package as source or to build is no longer about whether it's an engine extension or not.
 		if(ext.type == ExtensionType.ENGINE)
 		{
 			//zip folder
@@ -210,39 +140,15 @@ public class Sources
 		}
 		else
 		{
-			String gradleWrapper = "gradlew";
-			if(System.getProperty("os.name").startsWith("Windows")) {
-				gradleWrapper = "gradlew.bat";
-			}
 			//build jar
-			File buildFile = new File(sourceFile, "build.xml");
 			boolean success = false;
-			if(buildFile.exists())
-			{
-				success = AntExecutor.executeAntTask(buildFile.getAbsolutePath());
-			}
-			else if(new File(sourceFile, gradleWrapper).exists())
-			{
-				//String[] args = new String[] {new File(sourceFile, gradleWrapper).getAbsolutePath(), "installToolsetToWorkspace"};
-				//success = ProcessUtils.runCommandResult(sourceFile, args) == 0;
-				File outJar = new File(Prefs.get(Prefs.SW_WORKSPACE) + "extensions" + File.separator + ext.id + ".jar");
-				outJar.delete();
-				JOptionPane.showMessageDialog(RepmanMain.instance, "Build the new extension version manually, and then continue", "Build extension", JOptionPane.PLAIN_MESSAGE);
-				try
-				{
-					ExtensionManifest man = ExtensionManifest.fromJar(outJar);
-					success = man.version.equals(version);
-				}
-				catch(IOException e)
-				{
-					throw new Exception("Failed to read .jar manifest.");
-				} 
-			}
+			//TODO: BUILD THE EXTENSION
 			if(!success)
 			{
 				throw new Exception("Failed to build .jar");
 			}
-			
+
+			//TODO: UPDATE EXPECTED OUTPUT PATH AND MANIFEST INFO
 			String fs = File.separator;
 			File outJar = new File(Prefs.get(Prefs.SW_WORKSPACE) + "extensions" + fs + ext.id + ".jar");
 			try
@@ -263,6 +169,7 @@ public class Sources
 			
 			File dest = RepmanMain.instance.getErm().getRepositories().get(ext.repository).getVersionLocalLocation(ext, version);
 			dest.getParentFile().mkdirs();
+			//TODO: CORRECT OUTPUT FOR ENGINE+TOOLSET OR TOOLSET-ONLY
 			Zip.zip(outJar, dest);
 		}
 		
