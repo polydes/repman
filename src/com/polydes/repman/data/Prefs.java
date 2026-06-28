@@ -1,14 +1,15 @@
 package com.polydes.repman.data;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.io.FileUtils;
+import com.polydes.repman.ui.RepmanMain;
 import org.apache.log4j.Logger;
 
 public class Prefs
@@ -17,7 +18,6 @@ public class Prefs
 	
 	private static HashMap<String,String> prefs;
 	
-	public static final String SW_WORKSPACE = "sw.workspace";
 	public static final String WINDOW_WIDTH = "window.width";
 	public static final String WINDOW_HEIGHT = "window.height";
 	public static final String SPLIT_PANE_WIDTH = "splitpane.width";
@@ -35,7 +35,7 @@ public class Prefs
 			
 			try
 			{
-				putLinesInMap(FileUtils.readLines(new File("prefs.txt")), prefs);
+				putLinesInMap(Files.readAllLines(Path.of(RepmanMain.REPMAN_DIR, "prefs.txt")), prefs);
 			}
 			catch(IOException e)
 			{
@@ -59,7 +59,7 @@ public class Prefs
 		
 		try
 		{
-			FileUtils.writeLines(new File("prefs.txt"), lines, "\n");
+			Files.write(Path.of(RepmanMain.REPMAN_DIR, "prefs.txt"), lines);
 		}
 		catch(IOException e)
 		{
@@ -82,7 +82,7 @@ public class Prefs
 				continue;
 			}
 			
-			map.put(parts[0], parts[1]);
+			map.put(parts[0].trim(), parts[1].trim());
 		}
 	}
 }

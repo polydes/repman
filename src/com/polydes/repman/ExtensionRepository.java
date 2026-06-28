@@ -1,26 +1,42 @@
 package com.polydes.repman;
 
-import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 import javax.swing.SwingWorker;
 
-import com.polydes.repman.util.NotifierHashMap;
+import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Logger;
+import stencyl.core.api.struct.NotifierHashMap;
+import stencyl.core.ext.ExtensionInfo;
+import stencyl.core.ext.backend.LocalRepoBackend;
+import stencyl.core.ext.backend.NetRepoBackend;
+import stencyl.core.api.Version;
+import stencyl.core.ext.net.NetExtension;
 
 public class ExtensionRepository
 {
+	private static final Logger log = Logger.getLogger(ExtensionRepository.class);
+
 	public final String url;
-	private NetRepoBackend netBackend;
-	private LocalRepoBackend localBackend;
-	
-	public ExtensionRepository(String url)
+	private final Path cachePath;
+	private final NetRepoBackend netBackend;
+	private final LocalRepoBackend localBackend;
+
+	public ExtensionRepository(String url, Path cacheRoot)
 	{
 		this.url = url;
-		
+
 		netBackend = new NetRepoBackend(url);
 		
 		String local = url.replace("http://", "").replace("https://", "");
-		
-		localBackend = new LocalRepoBackend(url, local);
+		cachePath = cacheRoot.resolve(local);
+
+		localBackend = new LocalRepoBackend(url, cachePath);
 		
 		updateRepositoryInfo();
 	}
@@ -37,67 +53,101 @@ public class ExtensionRepository
 			@Override
 			protected String doInBackground() throws Exception
 			{
-				localBackend.update(netBackend);
+				localBackend.update(netBackend, true);
 				return null;
 			}
 		}.execute();
 	}
 	
-	public NotifierHashMap<String, Extension> getExtensions(ExtensionType type)
+	public NotifierHashMap<String, NetExtension> getExtensions()
 	{
-		return localBackend.allExtensions.get(type);
+		return localBackend.allExtensions;
 	}
 
-	public File getExtensionLocalLocation(Extension ext)
+	public Path getExtensionLocalLocation(String extensionID)
 	{
-		return localBackend.getExtensionLocalLocation(ext);
+		return cachePath.resolve(extensionID);
 	}
 	
-	public File getVersionLocalLocation(Extension ext, Version v)
+	public Path getVersionLocalLocation(String extensionID, Version v)
 	{
-		return localBackend.getVersionLocation(ext, v);
+		return cachePath.resolve(extensionID, v + ".zip");
 	}
 	
-	public boolean hasVersionLocally(Extension ext, Version v)
+	public boolean hasVersionLocally(NetExtension ext, Version v)
 	{
-		return localBackend.hasVersionLocally(ext, v);
+		return Files.exists(cachePath.resolve(ext.id, v + ".zip"));
 	}
 	
-	public void setHasVersionLocally(Extension ext, Version v, boolean value, Runnable callback)
+	public void setHasVersionLocally(NetExtension ext, Version v, boolean value, Runnable callback)
 	{
 		if(value == hasVersionLocally(ext, v))
 			return;
-		
-		File location = localBackend.getVersionLocation(ext, v);
+
+		Path location = cachePath.resolve(ext.id, v + ".zip");
 		
 		if(value)
 		{
-			downloadExtension(ext.type, ext.id, v, location, callback);
+			String url = netBackend.getDownloadUrl(ext.id, v);
+			try
+			{
+				FileUtils.copyURLToFile(new URI(url).toURL(), location.toFile(), 20000, 20000);
+				callback.run();
+			}
+			catch(IOException | URISyntaxException e)
+			{
+				log.error(e.getMessage(), e);
+			}
 		}
 		else
 		{
-			location.delete();
+			try
+			{
+				Files.delete(location);
+			}
+			catch(IOException e)
+			{
+				log.error(e.getMessage(), e);
+			}
 		}
 	}
 
-	public void refreshInstalledVersions(Extension ext)
-	{
-		localBackend.refreshInstalledVersions(ext);
-	}
-	
-	public void setInstalledVersion(Extension ext, Version v, boolean value, Runnable callback)
-	{
-		localBackend.setInstalledVersion(ext, v, value, callback);
-	}
-
-	public void downloadExtension(ExtensionType extensionType, String id, Version version, File downloadLoc, Runnable runnable)
-	{
-		netBackend.downloadExtension(extensionType, id, version, downloadLoc, runnable);
-	}
-	
 	@Override
 	public String toString()
 	{
 		return url;
+	}
+
+	public void loadExtension(Path extensionPath)
+	{
+		try
+		{
+			ExtensionInfo info = ExtensionInfo.loadExtensionInfo(extensionPath);
+			if(info != null)
+			{
+				NetExtension ext = new NetExtension(info.getID());
+				ext.id = info.getID();
+				ext.name = info.getName();
+				ext.description = info.getDescription();
+				ext.author = info.getAuthorName();
+				ext.cat = info.getType();
+				ext.website = info.getWebsite();
+				ext.repository = info.getRepository();
+				ext.icon = info.getIcon();
+				if(Files.exists(extensionPath.resolve("versions.json")))
+				{
+					ext.versions = ExtensionInfo.readVersions(extensionPath.resolve("versions.json"));
+				}
+				else
+				{
+					ext.versions = List.of();
+				}
+				localBackend.allExtensions.put(info.getID(), ext);
+			}
+		}
+		catch(IOException e)
+		{
+			log.error(e.getMessage(), e);
+		}
 	}
 }

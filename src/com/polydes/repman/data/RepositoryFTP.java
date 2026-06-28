@@ -9,8 +9,8 @@ import java.util.Map;
 
 import com.esotericsoftware.yamlbeans.YamlException;
 import com.esotericsoftware.yamlbeans.YamlReader;
-import com.polydes.repman.Extension;
 import com.polydes.repman.ExtensionRepository;
+import com.polydes.repman.ui.RepmanMain;
 import com.polydes.repman.util.io.FTPHelper;
 import com.polydes.repman.util.io.FTPHelper.FTPConnectionType;
 
@@ -43,7 +43,7 @@ public class RepositoryFTP
 		
 		try
 		{
-			YamlReader reader = new YamlReader(new FileReader("repositories.yml"));
+			YamlReader reader = new YamlReader(new FileReader(RepmanMain.REPMAN_DIR + File.separator + "repositories.yml"));
 			List repositoriesList = (List) ((Map) reader.read()).get("repositories");
 		    for(Object o : repositoriesList)
 		    {
@@ -78,11 +78,11 @@ public class RepositoryFTP
 		}
 	}
 	
-	public static void upload(ExtensionRepository repo, Extension ext, List<String> files)
+	public static void upload(ExtensionRepository repo, String extensionID, List<String> files)
 	{
 		RepoInfo info = getRepoInfo(repo.url);
-		String extRemote = info.root + ext.type.toString() + "/" + ext.id + "/";
-		String extLocal = repo.getExtensionLocalLocation(ext).getAbsolutePath() + File.separator;
+		String extRemote = info.root + "extensions" + "/" + extensionID + "/";
+		String extLocal = repo.getExtensionLocalLocation(extensionID).toString() + "/";
 		
 		FTPHelper ftp = new FTPHelper(info.host, info.connectionType, info.username, info.password);
 		for(String toUpload : files)

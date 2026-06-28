@@ -5,6 +5,7 @@
 /.settings/
 /build/
 /bin/
+/out/
 /prefs.txt
 /repositories.yml
 /sources.yml

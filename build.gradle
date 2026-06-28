@@ -9,6 +9,10 @@ java {
     }
 }
 
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '--enable-preview'
+}
+
 group = 'com.polydes'
 version = '0.0.1'
 
@@ -24,6 +28,7 @@ sourceSets {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven {
         url "https://www.stencyl.com/dl/maven2/releases"
@@ -36,15 +41,23 @@ repositories {
 dependencies {
     //Stencyl and its dependencies
     implementation enforcedPlatform('com.stencyl:stencyl-platform:4.2.0')
+    implementation group: 'com.stencyl',                    name: 'stencyl',      version: '4.2.0'
     implementation group: 'org.apache.commons',             name: 'commons-lang3'
-    implementation group: 'log4j',                          name: 'log4j'
+    implementation group: 'ch.qos.reload4j',                name: 'reload4j'
     implementation group: 'commons-io',                     name: 'commons-io'
     implementation group: 'org.json',                       name: 'json'
     implementation group: 'com.esotericsoftware.yamlbeans', name: 'yamlbeans'
     implementation group: 'com.stencyl',                    name: 'filetree-indexer'
+    implementation group: 'com.stencyl',                    name: 'jide-oss'
     implementation group: 'com.formdev',                    name: 'flatlaf'
-    implementation group: 'com.jcraft',                     name: 'jsch',         version: '0.1.53'
-    implementation group: 'commons-net',                    name: 'commons-net',  version: '3.4'
+    implementation group: 'com.formdev',                    name: 'flatlaf-extras'
+    implementation group: 'net.java.dev.jna',               name: 'jna-platform'
+    implementation group: 'com.fifesoft',                   name: 'rsyntaxtextarea'
+    implementation group: 'com.stencyl',                    name: 'macwidgets'
+    implementation group: 'com.jcraft',                     name: 'jsch',             version: '0.1.53'
+    implementation group: 'commons-net',                    name: 'commons-net',      version: '3.4'
+    implementation group: 'org.eclipse.jgit',               name: 'org.eclipse.jgit', version: '5.13.0.202109080827-r'
+    implementation group: 'org.eclipse.jgit',    name: 'org.eclipse.jgit.ssh.apache', version: '5.13.0.202109080827-r'
 }
 
 application {

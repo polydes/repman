@@ -120,7 +120,7 @@ public class MultiLineCellSupport extends AbstractCellEditor implements TableCel
 		colorProvider.colorCellComponent(jtextarea, table, value, isSelected, hasFocus, row, column);
 		
 		jtextarea.setFont(table.getFont());
-		jtextarea.setText(getString(value, value.getClass()));
+		jtextarea.setText(getString(value, table.getColumnClass(column)));
 		adjustRowHeight(table, row, column);
 		
 		this.table = table;
@@ -133,7 +133,7 @@ public class MultiLineCellSupport extends AbstractCellEditor implements TableCel
 	@Override
 	public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int rowIndex, int vColIndex)
 	{
-		valueClass = value.getClass();
+		valueClass = table.getColumnClass(vColIndex);
 		editing = true;
 		
 		value = getString(value, valueClass);

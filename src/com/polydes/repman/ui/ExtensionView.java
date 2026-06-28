@@ -1,37 +1,20 @@
 package com.polydes.repman.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Font;
-import java.awt.Graphics;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.text.DateFormat;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.beans.PropertyChangeEvent;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
 
 import javax.imageio.ImageIO;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultCellEditor;
-import javax.swing.Icon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.SwingConstants;
+import javax.swing.*;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -39,122 +22,124 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumnModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 
-import org.apache.commons.io.FileUtils;
+import com.formdev.flatlaf.util.ColorFunctions;
+import com.polydes.repman.data.LocalSource;
+import com.polydes.repman.ui.RepoTree.ExtData;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
-import com.polydes.repman.Extension;
-import com.polydes.repman.ExtensionDependency;
+import stencyl.core.api.tasks.TaskManager;
+import stencyl.core.api.Version;
+import stencyl.core.ext.ExtensionDependency;
 import com.polydes.repman.ExtensionRepository;
-import com.polydes.repman.ExtensionType;
-import com.polydes.repman.LocalRepoBackend.ExtensionVersion;
-import com.polydes.repman.Version;
 import com.polydes.repman.data.RepositoryFTP;
 import com.polydes.repman.data.Sources;
 import com.polydes.repman.res.Resources;
 import com.polydes.repman.ui.comp.CellColorProvider;
 import com.polydes.repman.ui.comp.IconProvider;
 import com.polydes.repman.ui.comp.MultiLineCellSupport;
-import com.polydes.repman.util.Util;
+import stencyl.core.ext.ExtensionInfo;
+import stencyl.core.ext.ExtensionInfo.ExtensionCategory;
+import stencyl.core.ext.net.ChangeEntry;
+import stencyl.core.ext.net.ExtensionVersion;
+import stencyl.core.ext.net.NetExtension;
+import stencyl.core.util.CollectionHelper;
+import stencyl.core.util.ParsingHelper;
 
 public class ExtensionView extends JPanel implements TreeSelectionListener
 {
 	private static final Logger log = Logger.getLogger(ExtensionView.class);
-	
-	Extension ext;
+
+	ExtData ext;
+
+	List<VersionInfo> versionList;
+
+	record VersionInfo(
+			Version version,
+			ChangeEntry localChangeEntry, ChangeEntry remoteChangeEntry,
+			ExtensionVersion localVersion, ExtensionVersion remoteVersion
+	) {}
+
 	JTable versionTable;
 	VersionTableModel vtableModel;
+
+	JList commitList;
+	CommitListModel commitListModel;
 	
 	JButton buildNewButton;
 	JButton uploadToRepoButton;
-	
+
 	public ExtensionView()
 	{
 		super(new BorderLayout());
+
 		vtableModel = new VersionTableModel();
+		commitListModel = new CommitListModel();
 		buildNewButton = new JButton("Build New Version");
 		buildNewButton.addActionListener((e) -> {
-			try
-			{
-				Sources.buildSource(ext, (newVersion) -> {
-					ext.versions.add(newVersion);
-					ext.versions.sort(null);
-					RepmanMain.instance.getErm().getRepositories().get(ext.repository).refreshInstalledVersions(ext);
-//					vtableModel.fireTableDataChanged();
-//					repaint();
-					Extension toRefresh = ext;
-					ext = null;
-					refresh(toRefresh);
-				});
-			}
-			catch(Exception ex)
-			{
-				log.error(ex.getMessage(), ex);
-				JOptionPane.showMessageDialog(RepmanMain.instance, ex.getMessage(), "Build Failed", JOptionPane.ERROR_MESSAGE);
-			}
+			TaskManager.runTask("Build Extension", task -> {
+				try {
+					Sources.buildSource(task, ext, (newVersion) -> {
+						ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
+						ExtData toRefresh = ext;
+						ext = null;
+						refresh(toRefresh);
+					});
+				} catch(Exception ex) {
+					throw task.failWithError("Build Failed", ex.getMessage(), ex);
+				}
+			});
 		});
 		uploadToRepoButton = new JButton("Upload to Repository");
 		uploadToRepoButton.addActionListener((e) -> {
 			try
 			{
-				ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(ext.repository);
+				if(ext.localExt == null || !ext.localExt.isLoaded())
+				{
+					JOptionPane.showMessageDialog(RepmanMain.instance, "Can't upload without local source", "Upload Failed", JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				ExtensionInfo info = ext.localExt.getInfo();
+				ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(info.getRepository());
+
+				Path sourcePath = ext.localExt.getPath();
+				Path mirrorPath = repo.getExtensionLocalLocation(info.getID());
 				
-				File extFolder = repo.getExtensionLocalLocation(ext);
-				
-				File revisionFile = new File(extFolder, "revision");
+				Path revisionFile = mirrorPath.resolve("revision");
 				int revision = 0;
-				if(revisionFile.exists())
-					revision = Util.parseInt(FileUtils.readFileToString(revisionFile), 0);
+				if(Files.exists(revisionFile))
+					revision = ParsingHelper.parseInt(Files.readString(revisionFile), 0);
 				++revision;
-				FileUtils.writeStringToFile(revisionFile, "" + revision);
-				
-				File iconFile = new File(extFolder, "icon.png");
-				BufferedImage bi = new BufferedImage(ext.icon.getIconWidth(), ext.icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
+				Files.writeString(revisionFile, "" + revision);
+
+				Image icon = ext.localExt.getInfo().getIcon();
+				Path iconFile = mirrorPath.resolve("icon.png");
+				BufferedImage bi = new BufferedImage(icon.getWidth(null), icon.getHeight(null), BufferedImage.TYPE_INT_ARGB);
 				Graphics g = bi.createGraphics();
-				ext.icon.paintIcon(null, g, 0,0);
+				g.drawImage(icon, 0, 0, null);
 				g.dispose();
-				ImageIO.write(bi, "png", iconFile);
-				
-				File infoTxtFile = new File(extFolder, "info.txt");
-				List<String> lines = Arrays.asList(
-					"Name=" + ext.name,
-					"Description=" + ext.description,
-					"Author=" + ext.author,
-					"Website=" + ext.website,
-					(ext.type == ExtensionType.TOOLSET) ?
-							"Type=" + ext.cat.toString().toLowerCase(Locale.ENGLISH) : ""
-				);
-				FileUtils.writeLines(infoTxtFile, lines, "\n");
-				
-				File versionsFile = new File(extFolder, "versions.json");
-				JSONObject j = new JSONObject();
-				JSONArray jver = new JSONArray();
-				ext.versions.forEach(v -> jver.put(v.toJSON()));
-				j.put("versions", jver);
-				FileUtils.writeStringToFile(versionsFile, j.toString());
-				
+				ImageIO.write(bi, "png", iconFile.toFile());
+
+				NetExtension.writeExtensionData(info, mirrorPath, "info.json");
+				Files.copy(sourcePath.resolve("versions.json"), mirrorPath.resolve("versions.json"));
+				Files.copy(sourcePath.resolve("changes.md"), mirrorPath.resolve("changes.md"));
+
 				List<String> filesToUpload = new ArrayList<>();
 				filesToUpload.addAll(Arrays.asList(
 					"revision",
 					"icon.png",
-					"info.txt",
-					"versions.json"
-				));
-				for(ExtensionVersion v : ext.versions)
-					if(v.local)
-						filesToUpload.add(v.version + ".zip");
+					"info.json",
+					"versions.json",
+					"changes.md"
+					));
+				for(VersionInfo vi : versionList)
+					if(vi.localVersion != null && vi.remoteVersion == null && hasLocal(vi.version))
+						filesToUpload.add(vi.version() + ".zip");
 				
-				RepositoryFTP.upload(repo, ext, filesToUpload);
-				
-				for(ExtensionVersion v : ext.versions)
-				{
-					v.local = false;
-					v.dirty = false;
-				}
-				
-				Extension toRefresh = ext;
+				RepositoryFTP.upload(repo, info.getID(), filesToUpload);
+
+				ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
+				ExtData toRefresh = ext;
 				ext = null;
 				refresh(toRefresh);
 			}
@@ -165,14 +150,98 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			}
 		});
 	}
-	
-	public void refresh(Extension ext)
+
+	private void localSourceUpdated(PropertyChangeEvent propertyChangeEvent)
+	{
+		if(propertyChangeEvent.getPropertyName().equals(LocalSource.LOCAL_GIT_PROPERTIES))
+		{
+			commitListModel.listUpdated();
+		}
+	}
+
+	public static final int COLUMN_VERSION = 0;
+	public static final int COLUMN_VERSION_LABEL = 1;
+	public static final int COLUMN_CHANGES = 2;
+	public static final int COLUMN_DEPENDENCIES = 3;
+	public static final int COLUMN_LOCAL = 4;
+//	public static final int COLUMN_REMOTE = 3;
+
+	public void refresh(ExtData ext)
 	{
 		if(this.ext == ext)
 			return;
-		
+
+		versionList = new ArrayList<>();
+
 		this.ext = ext;
-		
+		boolean useRemoteSource = ext.netExt != null;
+		boolean useLocalSource = ext.localExt != null && ext.localExt.isLoaded();
+		LocalSource localSource = ext.localExt;
+
+		ExtensionRepository repo = useRemoteSource ? RepmanMain.instance.getErm().getRepositories().get(ext.netExt.repository) : null;
+		Path mirrorPath = useRemoteSource ? repo.getExtensionLocalLocation(ext.netExt.id) : null;
+
+		Set<Version> allVersions = new HashSet<>();
+		List<ChangeEntry> netChanges = List.of();
+		Map<Version, ExtensionVersion> vToMirrorV = new HashMap<>();
+		Map<Version, ChangeEntry> vToMirrorCe = new HashMap<>();
+		Map<Version, ExtensionVersion> vToLocalV = new HashMap<>();
+		Map<Version, ChangeEntry> vToLocalCe = new HashMap<>();
+
+		if(useRemoteSource)
+		{
+			for(ExtensionVersion v : ext.netExt.versions)
+			{
+				allVersions.add(v.version());
+				vToMirrorV.put(v.version(), v);
+			}
+		}
+		if(useLocalSource)
+		{
+			for(ExtensionVersion v : localSource.getVersions())
+			{
+				allVersions.add(v.version());
+				vToLocalV.put(v.version(), v);
+			}
+		}
+		if(useRemoteSource)
+		{
+			try
+			{
+				netChanges = ExtensionInfo.readChanges(mirrorPath);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+			for(ChangeEntry entry : netChanges)
+			{
+				allVersions.add(entry.version());
+				vToMirrorCe.put(entry.version(), entry);
+			}
+		}
+		if(useLocalSource)
+		{
+			for(ChangeEntry entry : localSource.getChanges())
+			{
+				allVersions.add(entry.version());
+				vToLocalCe.put(entry.version(), entry);
+			}
+		}
+
+		for(Version version : CollectionHelper.sortForward(allVersions))
+		{
+			VersionInfo info = new VersionInfo(
+					version,
+					vToLocalCe.get(version),
+					vToMirrorCe.get(version),
+					vToLocalV.get(version),
+					vToMirrorV.get(version)
+			);
+
+			versionList.add(info);
+		}
+
 		removeAll();
 		
 		int pad = 10;
@@ -180,19 +249,27 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		
 		JPanel extensionInfoPanel = new JPanel();
 		extensionInfoPanel.setLayout(new BoxLayout(extensionInfoPanel, BoxLayout.Y_AXIS));
-		
-		JLabel extensionLabel = new JLabel("<html>" + ext.name + "<br>(" + ext.id + ")</html>");
-		extensionLabel.setIcon(ext.icon);
+
+		String extensionName = useLocalSource ? localSource.getInfo().getName() : ext.netExt.name;
+		String extensionID = useLocalSource ? localSource.getInfo().getID() : ext.netExt.id;
+		Image extensionIcon = useLocalSource ? localSource.getInfo().getIcon() : ext.netExt.icon;
+		String extensionAuthor = useLocalSource ? localSource.getInfo().getAuthorName() : ext.netExt.author;
+		String extensionDescription = useLocalSource ? localSource.getInfo().getDescription() : ext.netExt.description;
+		String extensionWebsite = useLocalSource ? localSource.getInfo().getWebsite() : ext.netExt.website;
+		ExtensionCategory extensionType = useLocalSource ? localSource.getInfo().getType() : ext.netExt.cat;
+
+		JLabel extensionLabel = new JLabel("<html>" + extensionName + "<br>(" + extensionID + ")</html>");
+		extensionLabel.setIcon(new ImageIcon(extensionIcon));
 		extensionLabel.setFont(getFont().deriveFont(14.0f).deriveFont(Font.BOLD));
 		
 		JLabel infoLabel = new JLabel
 		(
 			"<html><b>" +
-			"Author: " + ext.author + "<br>" +
-			"Description: " + ext.description + "<br>" +
-			(ext.type == ExtensionType.TOOLSET ? "Toolset Category: " + ext.cat.toString() + "<br>" : "") +
-			"Website: " + ext.website + "<br>" +
-			"Local Source: " + Sources.getSource(ext) + 
+			"Author: " + extensionAuthor + "<br>" +
+			"Description: " + extensionDescription + "<br>" +
+			"Category: " + extensionType.toString() + "<br>" +
+			"Website: " + extensionWebsite + "<br>" +
+			"Local Source: " + (useLocalSource ? localSource.getPath() : "<no local source>") +
 			"</b></html>"
 		);
 		infoLabel.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -218,31 +295,53 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		extensionInfoPanel.add(Box.createVerticalStrut(5));
 		
 		add(extensionInfoPanel, BorderLayout.NORTH);
-		
+
+		JPanel mainContentPanel = new JPanel(new BorderLayout());
+
+		commitList = new JList<>(commitListModel);
+		JScrollPane commitScroll = new JScrollPane(commitList);
+		commitScroll.setPreferredSize(new Dimension(0, 100));
+		mainContentPanel.add(commitScroll, BorderLayout.NORTH);
+
 		CellColorProvider colorProvider = new ExtensionVersionCellColorProvider();
 		
 		versionTable = new JTable(vtableModel);
 		
 		MultiLineCellSupport mlsRender = new MultiLineCellSupport();
 		MultiLineCellSupport mlsEdit = new MultiLineCellSupport(mlsRender);
-		
-		
+
 		mlsRender.setColorProvider(colorProvider);
 		
 		mlsRender.addClassSupport
 		(
 			Version.class,
-			(v) -> v.toString(),
-			(s) -> new Version(s)
+			(v) -> {
+				if(ext.localExt != null && ext.localExt.isGitStateLoaded() && ext.localExt.isGitRemoteStateLoaded())
+				{
+					boolean inLocal = ext.localExt.getLocalTags().contains(v.toString()) || ext.localExt.getLocalTags().contains("v" + v);
+					boolean inRemote = ext.localExt.getRemoteTags().contains(v.toString()) || ext.localExt.getRemoteTags().contains("v" + v);
+					if(!inLocal && !inRemote)
+						return "[U]"+v;
+					if(inLocal && !inRemote)
+						return "[L]"+v;
+					if(inRemote && !inLocal)
+						return "[R]"+v;
+				}
+				return v.toString();
+			},
+			(s) -> null
 		);
-		
-		mlsRender.addClassSupport
-		(
-			ExtensionDependency[].class,
+
+		mlsRender.addClassSupport(ExtensionDependency[].class,
 			(deps) -> StringUtils.join(deps, "\n"),
-			(s) -> ExtensionDependency.fromStringList(s.replaceAll("\n", ","), null)
+			(s) -> null
 		);
-		
+
+		mlsRender.addClassSupport(ChangeEntry.class,
+			(entry) -> entry.body(),
+			(s) -> null
+		);
+
 		IconCellRenderer iconRenderer = new IconCellRenderer();
 		IconToggleEditor iconToggleEditor = new IconToggleEditor(new JCheckBox());
 		iconRenderer.setColorProvider(colorProvider);
@@ -252,28 +351,31 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		versionTable.setDefaultEditor(Version.class, mlsEdit);
 		versionTable.setDefaultRenderer(String.class, mlsRender);
 		versionTable.setDefaultEditor(String.class, mlsEdit);
+		versionTable.setDefaultRenderer(ChangeEntry.class, mlsRender);
+		versionTable.setDefaultEditor(ChangeEntry.class, mlsEdit);
 		versionTable.setDefaultRenderer(ExtensionDependency[].class, mlsRender);
 		versionTable.setDefaultEditor(ExtensionDependency[].class, mlsEdit);
 		
 		versionTable.setDefaultRenderer(LocalDownloadState.class, iconRenderer);
 		versionTable.setDefaultEditor(LocalDownloadState.class, iconToggleEditor);
-		versionTable.setDefaultRenderer(LocalInstallState.class, iconRenderer);
-		versionTable.setDefaultEditor(LocalInstallState.class, iconToggleEditor);
 		versionTable.setDefaultRenderer(DeleteButton.class, iconRenderer);
 		versionTable.setDefaultEditor(DeleteButton.class, iconToggleEditor);
 		
 //		resizeColumnWidth(versionTable);
-		versionTable.getTableHeader().getColumnModel().getColumn(0).setMaxWidth(60);
-		versionTable.getTableHeader().getColumnModel().getColumn(1).setMaxWidth(95);
-		versionTable.getTableHeader().getColumnModel().getColumn(1).setMinWidth(95);
-		versionTable.getTableHeader().getColumnModel().getColumn(4).setMaxWidth(20);
-		versionTable.getTableHeader().getColumnModel().getColumn(5).setMaxWidth(20);
-		versionTable.getTableHeader().getColumnModel().getColumn(6).setMaxWidth(20);
-		
-		add(new JScrollPane(versionTable), BorderLayout.CENTER);
-		
+		versionTable.getTableHeader().getColumnModel().getColumn(COLUMN_VERSION).setMaxWidth(75);
+		versionTable.getTableHeader().getColumnModel().getColumn(COLUMN_VERSION_LABEL).setMaxWidth(105);
+		versionTable.getTableHeader().getColumnModel().getColumn(COLUMN_VERSION_LABEL).setMinWidth(105);
+		versionTable.getTableHeader().getColumnModel().getColumn(COLUMN_LOCAL).setMaxWidth(20);
+//		versionTable.getTableHeader().getColumnModel().getColumn(COLUMN_REMOTE).setMaxWidth(20);
+
+		mainContentPanel.add(new JScrollPane(versionTable), BorderLayout.CENTER);
+
+		add(mainContentPanel, BorderLayout.CENTER);
+
 		revalidate();
 		repaint();
+
+		ext.localExt.addPropertyChangeListener(this::localSourceUpdated);
 	}
 	
 	public void resizeColumnWidth(JTable table)
@@ -292,14 +394,6 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		}
 	}
 
-	private static DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("MM/dd/yyyy");
-	private static String toIsoDate(String input)
-	{
-		LocalDate date = LocalDate.parse(input, inputFormat);
-		return date.format(DateTimeFormatter.ISO_DATE);
-	}
-
-	
 	public class VersionTableModel extends DefaultTableModel
 	{
 		@Override
@@ -307,13 +401,12 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			switch(column)
 			{
-				case 0: return "Version";
-				case 1: return "Date";
-				case 2: return "Changes";
-				case 3: return "Dependencies";
-				case 4: return "L"; //Local
-				case 5: return "I"; //Installed
-				case 6: return "R"; //Remove
+				case COLUMN_VERSION: return "Version";
+				case COLUMN_VERSION_LABEL: return "Label";
+				case COLUMN_CHANGES: return "Changes";
+				case COLUMN_DEPENDENCIES: return "Dependencies";
+				case COLUMN_LOCAL: return "L"; //Local
+//				case COLUMN_REMOTE: return "R"; //Remove
 				default: return "";
 			}
 		}
@@ -321,7 +414,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		@Override
 		public int getColumnCount()
 		{
-			return 7;
+			return 5;
 		}
 		
 		@Override
@@ -329,7 +422,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			if(ext == null)
 				return 0;
-			return ext.versions.size();
+			return versionList.size();
 		}
 		
 		@Override
@@ -337,16 +430,24 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			if(ext == null)
 				return null;
-			ExtensionVersion v = ext.versions.get(ext.versions.size() - (row + 1));
+			VersionInfo vi = versionList.get(versionList.size() - (row + 1));
 			switch(column)
 			{
-				case 0: return v.version;
-				case 1: return toIsoDate(v.date);
-				case 2: return v.changes;
-				case 3: return v.dependencies;
-				case 4: return hasLocal(v) ? LocalDownloadState.Delete : LocalDownloadState.Download;
-				case 5: return isInstalled(v) ? LocalInstallState.Uninstall : LocalInstallState.Install;
-				case 6: return DeleteButton.Delete;
+				case COLUMN_VERSION: return vi.version();
+				case COLUMN_VERSION_LABEL: return
+						vi.localChangeEntry  != null ? vi.localChangeEntry.label() :
+						vi.remoteChangeEntry != null ? vi.remoteChangeEntry.label() :
+						null;
+				case COLUMN_CHANGES: return
+						vi.localChangeEntry != null ? vi.localChangeEntry :
+						vi.remoteChangeEntry != null ? vi.remoteChangeEntry :
+						null;
+				case COLUMN_DEPENDENCIES: return
+						vi.localVersion != null ? vi.localVersion.dependencies() :
+						vi.remoteVersion != null ? vi.remoteVersion.dependencies() :
+						null;
+				case COLUMN_LOCAL: return hasLocal(vi.version) ? LocalDownloadState.Delete : LocalDownloadState.Download;
+//				case COLUMN_REMOTE: return DeleteButton.Delete;
 				default: return null;
 			}
 		}
@@ -356,16 +457,10 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			if(ext == null)
 				return;
-			ExtensionVersion v = ext.versions.get(ext.versions.size() - (row + 1));
+			VersionInfo vi = versionList.get(versionList.size() - (row + 1));
 			switch(column)
 			{
-				case 0: v.version = (Version) aValue; ext.versions.sort(null); versionTable.repaint(); break;
-				case 1: v.date = (String) aValue; v.dirty = true; break;
-				case 2: v.changes = (String) aValue; v.dirty = true; break;
-				case 3: v.dependencies = (ExtensionDependency[]) aValue; v.dirty = true; break;
-				case 4: setHasLocal(v, aValue == LocalDownloadState.Download); break;
-				case 5: setInstalled(v, aValue == LocalInstallState.Install); break;
-				case 6: removeVersion(v); break;
+				case COLUMN_LOCAL: setHasLocal(vi.version, aValue == LocalDownloadState.Download); break;
 				default: break;
 			}
 		}
@@ -375,13 +470,12 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			switch(columnIndex)
 			{
-				case 0: return Version.class;
-				case 1: return String.class;
-				case 2: return String.class;
-				case 3: return ExtensionDependency[].class;
-				case 4: return LocalDownloadState.class;
-				case 5: return LocalInstallState.class;
-				case 6: return DeleteButton.class;
+				case COLUMN_VERSION: return Version.class;
+				case COLUMN_VERSION_LABEL: return String.class;
+				case COLUMN_CHANGES: return ChangeEntry.class;
+				case COLUMN_DEPENDENCIES: return ExtensionDependency[].class;
+				case COLUMN_LOCAL: return LocalDownloadState.class;
+//				case COLUMN_REMOTE: return DeleteButton.class;
 				default: return null;
 			}
 		}
@@ -389,18 +483,20 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		@Override
 		public boolean isCellEditable(int row, int column)
 		{
-			if(column == 0)
+			if(column != COLUMN_LOCAL)
 				return false;
 			return super.isCellEditable(row, column);
 		}
 	}
-	
+
 	class ExtensionVersionCellColorProvider implements CellColorProvider
 	{
-		Color localColor = new Color(0xB8EDB4);
-		Color dirtyColor = new Color(0xEACCB2);
-		Color alternateColor = new Color(0xCEDDE5);
-		
+		private static final Color localColor = new Color(0xB8EDB4);
+		private static final Color remoteColor = new Color(0x959FCD);
+		private static final Color dirtyColor = new Color(0xEACCB2);
+		private static final Color missingColor = new Color(0xC85E4A);
+		private static final Color alternateColor = new Color(0xEDF5F9);
+
 		public ExtensionVersionCellColorProvider()
 		{
 		}
@@ -408,8 +504,8 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		@Override
 		public void colorCellComponent(JComponent c, JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
 		{
-			ExtensionVersion ev = ext.versions.get(ext.versions.size() - (row + 1));
-			
+			VersionInfo vi = versionList.get(versionList.size() - (row + 1));
+
 			if(isSelected)
 			{
 				c.setForeground(table.getSelectionForeground());
@@ -424,15 +520,59 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 				}
 				else
 				{
-					c.setBackground(new Color(0xEDF5F9));
+					c.setBackground(alternateColor);
 				}
 			}
-			
-			if(ev.local)
-				c.setBackground(localColor);
-			else if(ev.dirty)
-				c.setBackground(dirtyColor);
+
+			boolean changelogOnlyEntry =
+					vi.localVersion == null && vi.remoteVersion == null &&
+					(vi.localChangeEntry != null || vi.remoteChangeEntry != null);
+
+			if(changelogOnlyEntry)
+			{
+				c.setForeground(ColorFunctions.mix(c.getForeground(), c.getBackground(), .5f));
+			}
+			else if(column == COLUMN_CHANGES)
+			{
+				if(vi.localChangeEntry == null && vi.remoteChangeEntry == null)
+					c.setBackground(missingColor);
+				else if(vi.remoteChangeEntry == null)
+					c.setBackground(localColor);
+				else if(vi.localChangeEntry == null)
+					c.setBackground(remoteColor);
+				else if(!vi.localChangeEntry.equals(vi.remoteChangeEntry))
+					c.setBackground(dirtyColor);
+			}
+			else
+			{
+				if(vi.localVersion == null && vi.remoteVersion == null)
+					c.setBackground(missingColor);
+				else if(vi.remoteVersion == null)
+					c.setBackground(localColor);
+				else if(vi.localVersion == null)
+					c.setBackground(remoteColor);
+				else if(!versionsAreEqual(vi.localVersion, vi.remoteVersion))
+					c.setBackground(dirtyColor);
+			}
 		}
+	}
+
+	private static boolean versionsAreEqual(ExtensionVersion v1, ExtensionVersion v2)
+	{
+		if(!v1.version().equals(v2.version()))
+			return false;
+		if(v1.dependencies().length != v2.dependencies().length)
+			return false;
+		for(int i = 0; i < v1.dependencies().length; ++i)
+		{
+			if(!Objects.equals(v1.dependencies()[i].type, v2.dependencies()[i].type))
+				return false;
+			if(!Objects.equals(v1.dependencies()[i].id, v2.dependencies()[i].id))
+				return false;
+			if(!Objects.equals(v1.dependencies()[i].version, v2.dependencies()[i].version))
+				return false;
+		}
+		return true;
 	}
 	
 	enum LocalDownloadState implements IconProvider
@@ -443,25 +583,6 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		Icon icon;
 		
 		private LocalDownloadState(Icon icon)
-		{
-			this.icon = icon;
-		}
-		
-		@Override
-		public Icon get()
-		{
-			return icon;
-		}
-	}
-	
-	enum LocalInstallState implements IconProvider
-	{
-		Install(Resources.loadIcon("package.png")),
-		Uninstall(Resources.loadIcon("package_link.png"));
-		
-		Icon icon;
-		
-		private LocalInstallState(Icon icon)
 		{
 			this.icon = icon;
 		}
@@ -572,24 +693,70 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			super.fireEditingStopped();
 		}
 	}
-	
+
+	public class CommitListModel implements ListModel<String>
+	{
+		List<ListDataListener> listeners = new ArrayList<>();
+
+		@Override
+		public int getSize() {
+			if(ext != null && ext.localExt != null && ext.localExt.isGitStateLoaded())
+			{
+				return ext.localExt.getCommitsSinceLastVersionTag().size();
+			}
+			return 0;
+		}
+
+		@Override
+		public String getElementAt(int index) {
+			if(ext != null && ext.localExt != null && ext.localExt.isGitStateLoaded())
+			{
+				return ext.localExt.getCommitsSinceLastVersionTag().get(index);
+			}
+			return "";
+		}
+
+		private void listUpdated()
+		{
+			int size = getSize();
+			for(ListDataListener l : listeners)
+			{
+				l.contentsChanged(new ListDataEvent(this, ListDataEvent.CONTENTS_CHANGED, 0, size));
+			}
+		}
+
+		@Override
+		public void addListDataListener(ListDataListener l) {
+			listeners.add(l);
+		}
+
+		@Override
+		public void removeListDataListener(ListDataListener l) {
+			listeners.remove(l);
+		}
+	}
+
 	@Override
 	public void valueChanged(TreeSelectionEvent e)
 	{
 		Object o = ((DefaultMutableTreeNode) e.getPath().getLastPathComponent()).getUserObject();
-		if(o instanceof Extension)
+		if(o instanceof ExtData extData)
 		{
-			refresh((Extension) o);
+			refresh(extData);
 		}
 	}
 	
-	public boolean hasLocal(ExtensionVersion v)
+	public boolean hasLocal(Version v)
 	{
-		return RepmanMain.instance.getErm().getRepositories().get(ext.repository).hasVersionLocally(ext, v.version);
+		if(ext.netExt == null)
+			return false;
+		return RepmanMain.instance.getErm().getRepositories().get(ext.netExt.repository).hasVersionLocally(ext.netExt, v);
 	}
 	
-	public void setHasLocal(ExtensionVersion v, boolean value)
+	public void setHasLocal(Version v, boolean value)
 	{
+		if(ext.netExt == null)
+			return;
 		String action = value ? "Download" : "Delete";
 		Object[] options = {action, "Cancel"};
 		int n = JOptionPane.showOptionDialog(RepmanMain.instance,
@@ -602,58 +769,8 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 			options[1]);
 		
 		if(n == JOptionPane.YES_OPTION)
-			RepmanMain.instance.getErm().getRepositories().get(ext.repository).setHasVersionLocally(ext, v.version, value, () -> {
+			RepmanMain.instance.getErm().getRepositories().get(ext.netExt.repository).setHasVersionLocally(ext.netExt, v, value, () -> {
 				versionTable.repaint();
 			});
-	}
-	
-	public boolean isInstalled(ExtensionVersion v)
-	{
-		return v.installed;
-	}
-	
-	public void setInstalled(ExtensionVersion v, boolean value)
-	{
-		ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(ext.repository);
-		if(value && !repo.hasVersionLocally(ext, v.version))
-		{
-			JOptionPane.showMessageDialog(RepmanMain.instance, "Download this version before installing.", "Can't install.", JOptionPane.INFORMATION_MESSAGE);
-			return;
-		}
-		
-		String action = value ? "Install" : "Uninstall";
-		Object[] options = {action, "Cancel"};
-		int n = JOptionPane.showOptionDialog(RepmanMain.instance,
-			action + " this extension version in Stencyl?",
-			"Installed Version",
-			JOptionPane.YES_NO_OPTION,
-			JOptionPane.QUESTION_MESSAGE,
-			null,
-			options,
-			options[1]);
-		
-		if(n == JOptionPane.YES_OPTION)
-			repo.setInstalledVersion(ext, v.version, value, () -> {
-				versionTable.repaint();
-			});
-	}
-	
-	public void removeVersion(ExtensionVersion v)
-	{
-		Object[] options = {"Delete", "Cancel"};
-		int n = JOptionPane.showOptionDialog(RepmanMain.instance,
-			"Remove this version from the extension?",
-			"Remove Version",
-			JOptionPane.YES_NO_OPTION,
-			JOptionPane.QUESTION_MESSAGE,
-			null,
-			options,
-			options[1]);
-		
-		if(n == JOptionPane.YES_OPTION)
-		{
-			ext.versions.remove(v);
-			vtableModel.fireTableDataChanged();
-		}
 	}
 }
