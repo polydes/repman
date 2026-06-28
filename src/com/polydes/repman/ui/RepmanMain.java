@@ -35,6 +35,7 @@ import stencyl.sw.app.tasks.SwingTaskManager;
 
 public class RepmanMain extends JFrame
 {
+	public static final String GIT_GUI_PATH = System.getProperty("git.gui");
 	public static final String USER_DIR = System.getProperty("user.dir");
 	public static final String REPMAN_DIR = System.getProperty("repman.dir");
 

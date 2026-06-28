@@ -1,15 +1,17 @@
 package com.polydes.repman.ui;
 
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.swing.JPanel;
-import javax.swing.JTree;
+import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 
 import com.formdev.flatlaf.util.ColorFunctions;
 import com.polydes.repman.data.LocalSource;
@@ -19,6 +21,7 @@ import stencyl.core.api.struct.NotifierMap.MapListener;
 import com.polydes.repman.ExtensionRepository;
 import stencyl.core.ext.net.NetExtension;
 import stencyl.core.util.CollectionHelper;
+import stencyl.core.util.ProcessHelper;
 
 public class RepoTree extends JPanel
 {
@@ -65,6 +68,45 @@ public class RepoTree extends JPanel
 		});
 
 		add(tree, BorderLayout.CENTER);
+
+		tree.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				if(e.isPopupTrigger()) showPopup(e);
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				if(e.isPopupTrigger()) showPopup(e);
+			}
+
+			private void showPopup(MouseEvent e)
+			{
+				TreePath treePath = tree.getPathForLocation(e.getX(), e.getY());
+				if(treePath == null) return;
+
+				if(!(treePath.getLastPathComponent() instanceof DefaultMutableTreeNode dmtn))
+					return;
+
+				if(!(dmtn.getUserObject() instanceof ExtData extData))
+					return;
+
+				JPopupMenu popupMenu = new JPopupMenu();
+				if(extData.localExt != null)
+				{
+					JMenuItem openRepository = new JMenuItem("Open Repository");
+					openRepository.addActionListener(evt -> {
+						ProcessHelper.command(RepmanMain.GIT_GUI_PATH)
+								.args(extData.localExt.getPath().toString())
+								.onError(ProcessHelper.PRINT_ERRORS)
+								.runAsync();
+					});
+					popupMenu.add(openRepository);
+				}
+
+				popupMenu.show(tree, e.getX(), e.getY());
+			}
+		});
 	}
 
 	public JTree getTree()
