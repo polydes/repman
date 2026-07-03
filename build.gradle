@@ -54,6 +54,7 @@ dependencies {
     implementation group: 'net.java.dev.jna',               name: 'jna-platform'
     implementation group: 'com.fifesoft',                   name: 'rsyntaxtextarea'
     implementation group: 'com.stencyl',                    name: 'macwidgets'
+    implementation group: 'com.github.mizosoft.methanol',   name: 'methanol'
     implementation group: 'com.jcraft',                     name: 'jsch',             version: '0.1.53'
     implementation group: 'commons-net',                    name: 'commons-net',      version: '3.4'
     implementation group: 'org.eclipse.jgit',               name: 'org.eclipse.jgit', version: '5.13.0.202109080827-r'

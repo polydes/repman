@@ -3,6 +3,7 @@ package com.polydes.repman.data;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,19 +78,33 @@ public class RepositoryFTP
 			repositories = null;
 		}
 	}
-	
-	public static void upload(ExtensionRepository repo, String extensionID, List<String> files)
+
+	public record FileToUpload(Path fromPath, String relativePath) {}
+	public static void upload(ExtensionRepository repo, String extensionID, List<FileToUpload> files)
 	{
 		RepoInfo info = getRepoInfo(repo.url);
 		String extRemote = info.root + "extensions" + "/" + extensionID + "/";
-		String extLocal = repo.getExtensionLocalLocation(extensionID).toString() + "/";
-		
+
 		FTPHelper ftp = new FTPHelper(info.host, info.connectionType, info.username, info.password);
-		for(String toUpload : files)
+		for(FileToUpload toUpload : files)
 		{
-			boolean binary = toUpload.endsWith(".zip") || toUpload.endsWith(".png");
-			String remote = extRemote + toUpload;
-			String local = extLocal + toUpload;
+			boolean binary = toUpload.relativePath.endsWith(".zip") || toUpload.relativePath.endsWith(".png");
+			String remote = extRemote + toUpload.relativePath;
+			String local = toUpload.fromPath.toString();
+			ftp.transfer(true, binary, remote, local);
+		}
+		ftp.disconnect();
+	}
+	public static void upload(ExtensionRepository repo, List<FileToUpload> files)
+	{
+		RepoInfo info = getRepoInfo(repo.url);
+
+		FTPHelper ftp = new FTPHelper(info.host, info.connectionType, info.username, info.password);
+		for(FileToUpload toUpload : files)
+		{
+			boolean binary = toUpload.relativePath.endsWith(".zip") || toUpload.relativePath.endsWith(".png");
+			String remote = info.root + toUpload.relativePath;
+			String local = toUpload.fromPath.toString();
 			ftp.transfer(true, binary, remote, local);
 		}
 		ftp.disconnect();

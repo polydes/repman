@@ -12,56 +12,66 @@ import javax.swing.SwingWorker;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import stencyl.core.api.struct.NotifierHashMap;
+import stencyl.core.api.struct.NotifierMap;
+import stencyl.core.api.struct.NotifierMap.MapListener;
 import stencyl.core.ext.ExtensionInfo;
-import stencyl.core.ext.backend.LocalRepoBackend;
 import stencyl.core.ext.backend.NetRepoBackend;
 import stencyl.core.api.Version;
+import stencyl.core.ext.backend.NetRepoBackend.RepoApiException;
+import stencyl.core.ext.backend.NetRepoBackendV4;
 import stencyl.core.ext.net.NetExtension;
+import stencyl.core.ext.net.RepositoryManifest;
 
 public class ExtensionRepository
 {
 	private static final Logger log = Logger.getLogger(ExtensionRepository.class);
 
 	public final String url;
-	private final Path cachePath;
-	private final NetRepoBackend netBackend;
-	private final LocalRepoBackend localBackend;
+	private final Path cacheRoot;
+	private Path cachePath;
+	private NetRepoBackend netBackend;
 
 	public ExtensionRepository(String url, Path cacheRoot)
 	{
 		this.url = url;
+		this.cacheRoot = cacheRoot;
+	}
 
-		netBackend = new NetRepoBackend(url);
-		
+	public void connect() throws IOException, RepoApiException
+	{
+		if(netBackend != null)
+			return;
+
 		String local = url.replace("http://", "").replace("https://", "");
 		cachePath = cacheRoot.resolve(local);
+		netBackend = NetRepoBackend.getBackend(url, cachePath);
 
-		localBackend = new LocalRepoBackend(url, cachePath);
-		
 		updateRepositoryInfo();
 	}
-	
-	public static boolean verifyUrl(String url)
-	{
-		return NetRepoBackend.verifyUrl(url);
-	}
-	
+
 	public void updateRepositoryInfo()
 	{
+		if(netBackend == null)
+			return;
+
 		new SwingWorker<String, Void>()
 		{
 			@Override
 			protected String doInBackground() throws Exception
 			{
-				localBackend.update(netBackend, true);
+				netBackend.update(true);
 				return null;
 			}
 		}.execute();
 	}
-	
+
+	public NetRepoBackend getNetBackend() {
+		return netBackend;
+	}
+
 	public NotifierHashMap<String, NetExtension> getExtensions()
 	{
-		return localBackend.allExtensions;
+		return netBackend.getExtensions();
 	}
 
 	public Path getExtensionLocalLocation(String extensionID)
@@ -142,12 +152,21 @@ public class ExtensionRepository
 				{
 					ext.versions = List.of();
 				}
-				localBackend.allExtensions.put(info.getID(), ext);
+				netBackend.getExtensions().put(info.getID(), ext);
 			}
 		}
 		catch(IOException e)
 		{
 			log.error(e.getMessage(), e);
 		}
+	}
+
+	public RepositoryManifest getManifest() {
+		return ((NetRepoBackendV4) netBackend).getManifest(false);
+	}
+
+	public boolean isConnected()
+	{
+		return netBackend != null;
 	}
 }

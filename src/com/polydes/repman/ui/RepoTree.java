@@ -3,10 +3,14 @@ package com.polydes.repman.ui;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.HashMap;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -15,12 +19,19 @@ import javax.swing.tree.TreePath;
 
 import com.formdev.flatlaf.util.ColorFunctions;
 import com.polydes.repman.data.LocalSource;
+import com.polydes.repman.data.RepositoryFTP;
 import com.polydes.repman.data.Sources.Repository;
+import com.polydes.repman.ui.ExtensionView.VersionInfo;
+import com.polydes.repman.util.Helpers;
 import stencyl.core.api.struct.NotifierMap.MapEvent;
 import stencyl.core.api.struct.NotifierMap.MapListener;
 import com.polydes.repman.ExtensionRepository;
+import stencyl.core.api.tasks.TaskManager;
+import stencyl.core.ext.ExtensionInfo;
 import stencyl.core.ext.net.NetExtension;
+import stencyl.core.ext.net.RepositoryManifest;
 import stencyl.core.util.CollectionHelper;
+import stencyl.core.util.ParsingHelper;
 import stencyl.core.util.ProcessHelper;
 
 public class RepoTree extends JPanel
@@ -87,6 +98,16 @@ public class RepoTree extends JPanel
 
 				if(!(treePath.getLastPathComponent() instanceof DefaultMutableTreeNode dmtn))
 					return;
+
+				if(dmtn.getUserObject() instanceof RepoData repoData)
+				{
+					JPopupMenu popupMenu = new JPopupMenu();
+					JMenuItem updateManifest = new JMenuItem("Update Manifest");
+					updateManifest.addActionListener(evt -> Helpers.updateRepositoryManifest(repoData));
+					popupMenu.add(updateManifest);
+					popupMenu.show(tree, e.getX(), e.getY());
+					return;
+				}
 
 				if(!(dmtn.getUserObject() instanceof ExtData extData))
 					return;
@@ -215,6 +236,9 @@ public class RepoTree extends JPanel
 			this.data.netRepo = repo;
 			model.nodeChanged(node);
 
+			if(!repo.isConnected())
+				return;
+
 			repo.getExtensions().addListener(netExtListener);
 
 			// Add existing extensions upon repo addition.
@@ -225,6 +249,9 @@ public class RepoTree extends JPanel
 
 		public void removeNetRepo() {
 			if (this.netRepo != null) {
+				if(!this.netRepo.isConnected())
+					return;
+
 				this.netRepo.getExtensions().removeListener(netExtListener);
 				// Nullify the net portion of all child extensions
 				for (ExtNodeManager extMgr : extManagers.values()) {

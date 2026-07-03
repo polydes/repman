@@ -10,6 +10,7 @@ import com.polydes.repman.data.Sources.Repository;
 import org.apache.log4j.Logger;
 
 import stencyl.core.api.struct.NotifierHashMap;
+import stencyl.core.ext.backend.NetRepoBackend.RepoApiException;
 
 public class ExtensionRepositoryManager
 {
@@ -32,7 +33,12 @@ public class ExtensionRepositoryManager
 			Repository repoSources = repoEntry.getValue();
 
 			ExtensionRepository repo = new ExtensionRepository(url, repoSources.cachePath());
-			repositories.put(repoEntry.getKey(), repo);
+			try {
+				repo.connect();
+			} catch (RepoApiException | IOException e) {
+                log.error(e.getMessage(), e);
+            }
+            repositories.put(repoEntry.getKey(), repo);
 
 //			Files.createDirectories(repoSources.cachePath());
 //			for(var entry : repoSources.sources().entrySet())

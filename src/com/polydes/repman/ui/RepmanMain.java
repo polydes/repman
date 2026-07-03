@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -142,6 +143,20 @@ public class RepmanMain extends JFrame
 					}
 				}
 				return null;
+			}
+
+			@Override
+			protected void done() {
+				try {
+					var _ = get();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				} catch (ExecutionException e) {
+					Throwable cause = e.getCause();
+					JOptionPane.showMessageDialog(null,
+							"An error occurred: " + cause.getMessage(),
+							"Error", JOptionPane.ERROR_MESSAGE);
+				}
 			}
 		}.execute();
 		

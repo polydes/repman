@@ -1,9 +1,9 @@
 package com.polydes.repman.data;
 
+import com.polydes.repman.util.GitRemoteParser;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.TransportConfigCallback;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.BranchTrackingStatus;
@@ -11,10 +11,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.SshTransport;
-import org.eclipse.jgit.transport.sshd.SshdSessionFactory;
-import org.eclipse.jgit.transport.sshd.SshdSessionFactoryBuilder;
 import stencyl.core.ext.ExtensionInfo;
 import stencyl.core.ext.net.ChangeEntry;
 import stencyl.core.ext.net.ExtensionVersion;
@@ -22,14 +18,9 @@ import stencyl.core.ext.net.ExtensionVersion;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.io.File;
 import java.io.IOException;
-import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 public class LocalSource
@@ -56,6 +47,7 @@ public class LocalSource
     private List<String> commitsSinceLastVersionTag;
     private List<String> localTags;
     private List<String> remoteTags;
+    private String remoteTaggedArtifactsUrl;
 
     public LocalSource(Path path)
     {
@@ -109,6 +101,7 @@ public class LocalSource
         commitsSinceLastVersionTag = null;
         localTags = null;
         remoteTags = null;
+        remoteTaggedArtifactsUrl = null;
     }
 
     public void loadGitState()
@@ -150,6 +143,16 @@ public class LocalSource
                 }
                 this.commitsSinceLastVersionTag.add(commit.getName().substring(0, 7) + " - " + commit.getShortMessage());
             }
+
+            try
+            {
+                remoteTaggedArtifactsUrl = "https://github.com/"+GitRemoteParser.getRepoOwnerAndName(path.toFile())+"/archive/refs/tags/%s.zip";
+            }
+            catch (Exception ex)
+            {
+                remoteTaggedArtifactsUrl = null;
+            }
+
             gitStateLoaded = true;
             pcs.firePropertyChange(LOCAL_GIT_PROPERTIES, null, Boolean.TRUE);
         }
@@ -225,6 +228,10 @@ public class LocalSource
 
     public List<String> getRemoteTags() {
         return remoteTags;
+    }
+
+    public String getRemoteTaggedArtifactsUrl() {
+        return remoteTaggedArtifactsUrl;
     }
 
     // PropertyChangeSupport

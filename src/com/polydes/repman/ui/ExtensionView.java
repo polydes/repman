@@ -8,8 +8,10 @@ import java.beans.PropertyChangeEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -24,6 +26,7 @@ import javax.swing.tree.DefaultMutableTreeNode;
 
 import com.formdev.flatlaf.util.ColorFunctions;
 import com.polydes.repman.data.LocalSource;
+import com.polydes.repman.data.RepositoryFTP.FileToUpload;
 import com.polydes.repman.ui.RepoTree.ExtData;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
@@ -43,6 +46,7 @@ import stencyl.core.ext.ExtensionInfo.ExtensionCategory;
 import stencyl.core.ext.net.ChangeEntry;
 import stencyl.core.ext.net.ExtensionVersion;
 import stencyl.core.ext.net.NetExtension;
+import stencyl.core.ext.net.RepositoryManifest;
 import stencyl.core.util.CollectionHelper;
 import stencyl.core.util.ParsingHelper;
 
@@ -68,6 +72,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 	
 	JButton buildNewButton;
 	JButton uploadToRepoButton;
+	JButton updateRepositoryManifestButton;
 
 	public ExtensionView()
 	{
@@ -77,8 +82,32 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		commitListModel = new CommitListModel();
 		buildNewButton = new JButton("Build New Version");
 		buildNewButton.addActionListener((e) -> {
+			if(ext.localExt == null || !ext.localExt.isLoaded())
+			{
+				JOptionPane.showMessageDialog(RepmanMain.instance, "Can't upload without local source", "Upload Failed", JOptionPane.ERROR_MESSAGE);
+				return;
+			}
 			TaskManager.runTask("Build Extension", task -> {
 				try {
+					ExtensionInfo info = ext.localExt.getInfo();
+					ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(info.getRepository());
+
+					Path sourcePath = ext.localExt.getPath();
+					Path mirrorPath = repo.getExtensionLocalLocation(info.getID());
+
+					Files.createDirectories(mirrorPath);
+
+					Image icon = ext.localExt.getInfo().getIcon();
+					Path iconFile = mirrorPath.resolve("icon.png");
+					BufferedImage bi = new BufferedImage(icon.getWidth(null), icon.getHeight(null), BufferedImage.TYPE_INT_ARGB);
+					Graphics g = bi.createGraphics();
+					g.drawImage(icon, 0, 0, null);
+					g.dispose();
+					ImageIO.write(bi, "png", iconFile.toFile());
+
+					NetExtension.writeExtensionData(info, mirrorPath, "info.json");
+					Files.copy(sourcePath.resolve("versions.json"), mirrorPath.resolve("versions.json"), StandardCopyOption.REPLACE_EXISTING);
+					Files.copy(sourcePath.resolve("changes.md"), mirrorPath.resolve("changes.md"), StandardCopyOption.REPLACE_EXISTING);
 					Sources.buildSource(task, ext, (newVersion) -> {
 						ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
 						ExtData toRefresh = ext;
@@ -92,62 +121,63 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		});
 		uploadToRepoButton = new JButton("Upload to Repository");
 		uploadToRepoButton.addActionListener((e) -> {
-			try
+			if(ext.localExt == null || !ext.localExt.isLoaded())
 			{
-				if(ext.localExt == null || !ext.localExt.isLoaded())
+				JOptionPane.showMessageDialog(RepmanMain.instance, "Can't upload without local source", "Upload Failed", JOptionPane.ERROR_MESSAGE);
+				return;
+			}
+			TaskManager.runTask("Publish Extension", task -> {
+				try
 				{
-					JOptionPane.showMessageDialog(RepmanMain.instance, "Can't upload without local source", "Upload Failed", JOptionPane.ERROR_MESSAGE);
-					return;
+					ExtensionInfo info = ext.localExt.getInfo();
+					ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(info.getRepository());
+					RepositoryManifest manifest = repo.getManifest();
+
+					Path sourcePath = ext.localExt.getPath();
+					Path mirrorPath = repo.getExtensionLocalLocation(info.getID());
+
+					Path revisionFile = mirrorPath.resolve("revision");
+					int revision = 0;
+					if(Files.exists(revisionFile))
+						revision = ParsingHelper.parseInt(Files.readString(revisionFile), 0);
+					++revision;
+					Files.writeString(revisionFile, "" + revision);
+
+					Image icon = ext.localExt.getInfo().getIcon();
+					Path iconFile = mirrorPath.resolve("icon.png");
+					BufferedImage bi = new BufferedImage(icon.getWidth(null), icon.getHeight(null), BufferedImage.TYPE_INT_ARGB);
+					Graphics g = bi.createGraphics();
+					g.drawImage(icon, 0, 0, null);
+					g.dispose();
+					ImageIO.write(bi, "png", iconFile.toFile());
+
+					NetExtension.writeExtensionData(info, mirrorPath, "info.json");
+					Files.copy(sourcePath.resolve("versions.json"), mirrorPath.resolve("versions.json"), StandardCopyOption.REPLACE_EXISTING);
+					Files.copy(sourcePath.resolve("changes.md"), mirrorPath.resolve("changes.md"), StandardCopyOption.REPLACE_EXISTING);
+
+                    List<FileToUpload> filesToUpload = new ArrayList<>(Stream.of(
+                                    "icon.png",
+                                    "info.json",
+                                    "versions.json",
+                                    "changes.md"
+                            )
+                            .map(rel -> new FileToUpload(mirrorPath.resolve(rel), rel)).toList());
+					for(VersionInfo vi : versionList)
+						if(vi.localVersion != null && vi.remoteVersion == null && hasLocal(vi.version))
+							filesToUpload.add(new FileToUpload(mirrorPath.resolve(vi.version() + ".zip"), vi.version() + ".zip"));
+
+					RepositoryFTP.upload(repo, info.getID(), filesToUpload);
+
+					ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
+					ExtData toRefresh = ext;
+					ext = null;
+					refresh(toRefresh);
 				}
-				ExtensionInfo info = ext.localExt.getInfo();
-				ExtensionRepository repo = RepmanMain.instance.getErm().getRepositories().get(info.getRepository());
-
-				Path sourcePath = ext.localExt.getPath();
-				Path mirrorPath = repo.getExtensionLocalLocation(info.getID());
-				
-				Path revisionFile = mirrorPath.resolve("revision");
-				int revision = 0;
-				if(Files.exists(revisionFile))
-					revision = ParsingHelper.parseInt(Files.readString(revisionFile), 0);
-				++revision;
-				Files.writeString(revisionFile, "" + revision);
-
-				Image icon = ext.localExt.getInfo().getIcon();
-				Path iconFile = mirrorPath.resolve("icon.png");
-				BufferedImage bi = new BufferedImage(icon.getWidth(null), icon.getHeight(null), BufferedImage.TYPE_INT_ARGB);
-				Graphics g = bi.createGraphics();
-				g.drawImage(icon, 0, 0, null);
-				g.dispose();
-				ImageIO.write(bi, "png", iconFile.toFile());
-
-				NetExtension.writeExtensionData(info, mirrorPath, "info.json");
-				Files.copy(sourcePath.resolve("versions.json"), mirrorPath.resolve("versions.json"));
-				Files.copy(sourcePath.resolve("changes.md"), mirrorPath.resolve("changes.md"));
-
-				List<String> filesToUpload = new ArrayList<>();
-				filesToUpload.addAll(Arrays.asList(
-					"revision",
-					"icon.png",
-					"info.json",
-					"versions.json",
-					"changes.md"
-					));
-				for(VersionInfo vi : versionList)
-					if(vi.localVersion != null && vi.remoteVersion == null && hasLocal(vi.version))
-						filesToUpload.add(vi.version() + ".zip");
-				
-				RepositoryFTP.upload(repo, info.getID(), filesToUpload);
-
-				ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
-				ExtData toRefresh = ext;
-				ext = null;
-				refresh(toRefresh);
-			}
-			catch(Exception ex)
-			{
-				log.error(ex.getMessage(), ex);
-				JOptionPane.showMessageDialog(RepmanMain.instance, ex.getMessage(), "Upload Failed", JOptionPane.ERROR_MESSAGE);
-			}
+				catch(Exception ex)
+				{
+					throw task.failWithError("Upload Failed", ex.getMessage(), ex);
+				}
+			});
 		});
 	}
 
