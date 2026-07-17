@@ -26,7 +26,7 @@ import javax.swing.tree.DefaultMutableTreeNode;
 
 import com.formdev.flatlaf.util.ColorFunctions;
 import com.polydes.repman.data.LocalSource;
-import com.polydes.repman.data.RepositoryFTP.FileToUpload;
+import com.polydes.repman.data.RepositoryStore.FileToUpload;
 import com.polydes.repman.ui.RepoTree.ExtData;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
@@ -35,7 +35,7 @@ import stencyl.core.api.tasks.TaskManager;
 import stencyl.core.api.Version;
 import stencyl.core.ext.ExtensionDependency;
 import com.polydes.repman.ExtensionRepository;
-import com.polydes.repman.data.RepositoryFTP;
+import com.polydes.repman.data.RepositoryStore;
 import com.polydes.repman.data.Sources;
 import com.polydes.repman.res.Resources;
 import com.polydes.repman.ui.comp.CellColorProvider;
@@ -166,7 +166,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 						if(vi.localVersion != null && vi.remoteVersion == null && hasLocal(vi.version))
 							filesToUpload.add(new FileToUpload(mirrorPath.resolve(vi.version() + ".zip"), vi.version() + ".zip"));
 
-					RepositoryFTP.upload(repo, info.getID(), filesToUpload);
+					RepositoryStore.upload(repo, info.getID(), filesToUpload);
 
 					ext.localExt.removePropertyChangeListener(this::localSourceUpdated);
 					ExtData toRefresh = ext;

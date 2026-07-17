@@ -1,11 +1,10 @@
 package com.polydes.repman.util;
 
 import com.polydes.repman.data.LocalSource;
-import com.polydes.repman.data.RepositoryFTP;
-import com.polydes.repman.data.RepositoryFTP.FileToUpload;
+import com.polydes.repman.data.RepositoryStore;
+import com.polydes.repman.data.RepositoryStore.FileToUpload;
 import com.polydes.repman.ui.RepoTree.RepoData;
 import com.polydes.repman.util.io.FilesHelper;
-import org.apache.commons.lang3.StringUtils;
 import stencyl.core.api.Version;
 import stencyl.core.api.tasks.TaskManager;
 import stencyl.core.ext.net.ExtensionVersion;
@@ -14,10 +13,8 @@ import stencyl.core.ext.net.RepositoryManifest;
 import stencyl.core.ext.net.RepositoryManifest.ArtifactEntry;
 import stencyl.core.ext.net.RepositoryManifest.PackageEntry;
 import stencyl.core.util.HashHelper;
-import stencyl.core.util.Util;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -131,7 +128,7 @@ public class Helpers
 
                     if(!filesToUpload.isEmpty())
                     {
-                        RepositoryFTP.upload(repoData.netRepo, extensionID, filesToUpload);
+                        RepositoryStore.upload(repoData.netRepo, extensionID, filesToUpload);
                     }
                 }
 
@@ -143,7 +140,7 @@ public class Helpers
                 Path manifestPath = mirrorUpdates.resolve("manifest.json");
                 Files.createDirectories(manifestPath.getParent());
                 Files.writeString(manifestPath, manifestContent);
-                RepositoryFTP.upload(repoData.netRepo, List.of(new FileToUpload(manifestPath, "manifest.json")));
+                RepositoryStore.upload(repoData.netRepo, List.of(new FileToUpload(manifestPath, "manifest.json")));
 
                 FilesHelper.deleteRecursively(mirrorUpdates);
 
