@@ -21,6 +21,8 @@ public class Prefs
 	public static final String WINDOW_WIDTH = "window.width";
 	public static final String WINDOW_HEIGHT = "window.height";
 	public static final String SPLIT_PANE_WIDTH = "splitpane.width";
+	public static final String ZOLA_BIN = "ext.zola.bin";
+	public static final String SITE_PATH = "site.path";
 	
 	public static String get(String key)
 	{

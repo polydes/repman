@@ -3,14 +3,9 @@ package com.polydes.repman.ui;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -18,20 +13,16 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
 import com.formdev.flatlaf.util.ColorFunctions;
+import com.polydes.repman.Zola;
 import com.polydes.repman.data.LocalSource;
-import com.polydes.repman.data.RepositoryFTP;
 import com.polydes.repman.data.Sources.Repository;
-import com.polydes.repman.ui.ExtensionView.VersionInfo;
 import com.polydes.repman.util.Helpers;
+import stencyl.app.comp.dg.MessageDialog;
 import stencyl.core.api.struct.NotifierMap.MapEvent;
 import stencyl.core.api.struct.NotifierMap.MapListener;
 import com.polydes.repman.ExtensionRepository;
-import stencyl.core.api.tasks.TaskManager;
-import stencyl.core.ext.ExtensionInfo;
 import stencyl.core.ext.net.NetExtension;
-import stencyl.core.ext.net.RepositoryManifest;
 import stencyl.core.util.CollectionHelper;
-import stencyl.core.util.ParsingHelper;
 import stencyl.core.util.ProcessHelper;
 
 public class RepoTree extends JPanel
@@ -105,6 +96,18 @@ public class RepoTree extends JPanel
 					JMenuItem updateManifest = new JMenuItem("Update Manifest");
 					updateManifest.addActionListener(evt -> Helpers.updateRepositoryManifest(repoData));
 					popupMenu.add(updateManifest);
+					JMenuItem buildDocsSite = new JMenuItem("Build Site");
+					buildDocsSite.addActionListener(evt -> {
+						try
+						{
+							Zola.buildSite();
+						}
+						catch(Exception ex)
+						{
+							MessageDialog.showErrorDialog("Failed to build docs", ex.getMessage());
+						}
+					});
+					popupMenu.add(buildDocsSite);
 					popupMenu.show(tree, e.getX(), e.getY());
 					return;
 				}

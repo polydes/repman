@@ -59,6 +59,7 @@ dependencies {
     implementation group: 'commons-net',                    name: 'commons-net',      version: '3.4'
     implementation group: 'org.eclipse.jgit',               name: 'org.eclipse.jgit', version: '5.13.0.202109080827-r'
     implementation group: 'org.eclipse.jgit',    name: 'org.eclipse.jgit.ssh.apache', version: '5.13.0.202109080827-r'
+    implementation group: 'org.tomlj',                      name: 'tomlj',            version: '1.0.0'
 }
 
 application {
