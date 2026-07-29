@@ -128,39 +128,6 @@ public class ExtensionRepository
 		return url;
 	}
 
-	public void loadExtension(Path extensionPath)
-	{
-		try
-		{
-			ExtensionInfo info = ExtensionInfo.loadExtensionInfo(extensionPath);
-			if(info != null)
-			{
-				NetExtension ext = new NetExtension(info.getID());
-				ext.id = info.getID();
-				ext.name = info.getName();
-				ext.description = info.getDescription();
-				ext.author = info.getAuthorName();
-				ext.cat = info.getType();
-				ext.website = info.getWebsite();
-				ext.repository = info.getRepository();
-				ext.icon = info.getIcon();
-				if(Files.exists(extensionPath.resolve("versions.json")))
-				{
-					ext.versions = ExtensionInfo.readVersions(extensionPath.resolve("versions.json"));
-				}
-				else
-				{
-					ext.versions = List.of();
-				}
-				netBackend.getExtensions().put(info.getID(), ext);
-			}
-		}
-		catch(IOException e)
-		{
-			log.error(e.getMessage(), e);
-		}
-	}
-
 	public RepositoryManifest getManifest() {
 		return ((NetRepoBackendV4) netBackend).getManifest(false);
 	}

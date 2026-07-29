@@ -13,14 +13,13 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
 import com.formdev.flatlaf.util.ColorFunctions;
-import com.polydes.repman.Zola;
 import com.polydes.repman.data.LocalSource;
 import com.polydes.repman.data.Sources.Repository;
-import com.polydes.repman.util.Helpers;
-import stencyl.app.comp.dg.MessageDialog;
+import com.polydes.repman.tasks.SiteTasks;
 import stencyl.core.api.struct.NotifierMap.MapEvent;
 import stencyl.core.api.struct.NotifierMap.MapListener;
 import com.polydes.repman.ExtensionRepository;
+import stencyl.core.api.tasks.TaskManager;
 import stencyl.core.ext.net.NetExtension;
 import stencyl.core.util.CollectionHelper;
 import stencyl.core.util.ProcessHelper;
@@ -90,24 +89,33 @@ public class RepoTree extends JPanel
 				if(!(treePath.getLastPathComponent() instanceof DefaultMutableTreeNode dmtn))
 					return;
 
-				if(dmtn.getUserObject() instanceof RepoData repoData)
+				if(dmtn.getUserObject().equals("Repositories"))
 				{
 					JPopupMenu popupMenu = new JPopupMenu();
-					JMenuItem updateManifest = new JMenuItem("Update Manifest");
-					updateManifest.addActionListener(evt -> Helpers.updateRepositoryManifest(repoData));
-					popupMenu.add(updateManifest);
-					JMenuItem buildDocsSite = new JMenuItem("Build Site");
-					buildDocsSite.addActionListener(evt -> {
-						try
+					JMenuItem serveSite = new JMenuItem("Serve Site");
+					serveSite.addActionListener(evt -> {
+						List<RepoData> repositories = new ArrayList<>();
+						for(RepoNodeManager node : repoManagers.values())
 						{
-							Zola.buildSite();
+							repositories.add(node.data);
 						}
-						catch(Exception ex)
-						{
-							MessageDialog.showErrorDialog("Failed to build docs", ex.getMessage());
-						}
+						TaskManager.runTask("Serve Site", task -> {
+							SiteTasks.serveSite(task, repositories);
+						});
 					});
-					popupMenu.add(buildDocsSite);
+					popupMenu.add(serveSite);
+					JMenuItem buildSite = new JMenuItem("Build and Publish Site");
+					buildSite.addActionListener(evt -> {
+						List<RepoData> repositories = new ArrayList<>();
+						for(RepoNodeManager node : repoManagers.values())
+						{
+							repositories.add(node.data);
+						}
+						TaskManager.runTask("Serve Site", task -> {
+							SiteTasks.buildAndPublishSite(task, repositories);
+						});
+					});
+					popupMenu.add(buildSite);
 					popupMenu.show(tree, e.getX(), e.getY());
 					return;
 				}

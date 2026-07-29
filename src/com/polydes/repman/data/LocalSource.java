@@ -1,6 +1,5 @@
 package com.polydes.repman.data;
 
-import com.polydes.repman.util.GitRemoteParser;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
@@ -47,7 +46,6 @@ public class LocalSource
     private List<String> commitsSinceLastVersionTag;
     private List<String> localTags;
     private List<String> remoteTags;
-    private String remoteTaggedArtifactsUrl;
 
     public LocalSource(Path path)
     {
@@ -101,7 +99,6 @@ public class LocalSource
         commitsSinceLastVersionTag = null;
         localTags = null;
         remoteTags = null;
-        remoteTaggedArtifactsUrl = null;
     }
 
     public void loadGitState()
@@ -142,15 +139,6 @@ public class LocalSource
                     break;
                 }
                 this.commitsSinceLastVersionTag.add(commit.getName().substring(0, 7) + " - " + commit.getShortMessage());
-            }
-
-            try
-            {
-                remoteTaggedArtifactsUrl = "https://github.com/"+GitRemoteParser.getRepoOwnerAndName(path.toFile())+"/archive/refs/tags/%s.zip";
-            }
-            catch (Exception ex)
-            {
-                remoteTaggedArtifactsUrl = null;
             }
 
             gitStateLoaded = true;
@@ -228,10 +216,6 @@ public class LocalSource
 
     public List<String> getRemoteTags() {
         return remoteTags;
-    }
-
-    public String getRemoteTaggedArtifactsUrl() {
-        return remoteTaggedArtifactsUrl;
     }
 
     // PropertyChangeSupport

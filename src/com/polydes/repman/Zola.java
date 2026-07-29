@@ -23,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.polydes.repman.data.LocalRepository;
 import com.polydes.repman.data.LocalSource;
 import com.polydes.repman.data.Prefs;
 import com.polydes.repman.data.Sources.Repository;
@@ -35,7 +36,6 @@ import org.tomlj.Toml;
 import org.tomlj.TomlParseResult;
 
 import com.polydes.repman.data.Sources;
-import com.polydes.repman.ui.RepmanMain;
 
 import fsindexer.diff.TreeDiff;
 import fsindexer.filter.PathFilter;
@@ -50,23 +50,21 @@ public class Zola
 {
 	private static final Logger log = Logger.getLogger(Zola.class);
 	
-	private static String CONTENT = "content";
-	private static String DATA = "data";
-	private static String STATIC = "static";
+	private static final String CONTENT = "content";
+	private static final String STATIC = "static";
 	
 	private static boolean serving = false;
-	
-	public static void buildSite() throws Exception
+
+	private static void prepareZolaInputs(Map<String, LocalRepository> builtRepositories) throws Exception
 	{
-		log.info("Build site");
-		
+		log.info("Prepare to build site");
+
 		Path site = Path.of(Prefs.get(Prefs.SITE_PATH));
 		Path siteZola = site.resolve("zola");
 		Path build = site.resolve("build");
 		Path buildZola = build.resolve("zola-stage");
 		Path buildZolaFinal = build.resolve("zola");
-		Path zolaExe = Path.of(Prefs.get(Prefs.ZOLA_BIN));
-		
+
 		if(Files.exists(buildZola))
 		{
 			FileUtils.deleteDirectory(buildZola.toFile());
@@ -74,24 +72,26 @@ public class Zola
 		Files.createDirectories(buildZola);
 		Files.createDirectories(buildZolaFinal);
 		Files.createDirectories(buildZola.resolveSibling("indices"));
-		
+
 		FileUtils.copyDirectory(siteZola.toFile(), buildZola.toFile());
-		
-		for(var repo : RepmanMain.instance.getErm().getRepositories().values())
+
+		for(var repo : builtRepositories.values())
 		{
+			String repoId = StringUtils.substringAfterLast(repo.getUrl(), "/");
+			FileUtils.copyDirectory(repo.getPath().toFile(), buildZola.resolve(STATIC, repoId, "v4").toFile());
 			buildCategory(repo, buildZola);
 		}
-		
+
 		//build/zola-gen.index (index of zola files built by us but not being served)
 		Path zolaGenIndexPath = build.resolve("zola-gen.index");
 		//build/zola-serve.index (index of zola files that are currently being served)
 		Path zolaServeIndexPath = build.resolve("zola-serve.index");
-		
+
 		var zolaGenTree = IndexedFileTree.load(buildZola, zolaGenIndexPath);
 		var zolaServeTree = IndexedFileTree.loadWithFilter(buildZolaFinal, zolaServeIndexPath, PathFilter.fromExcludePredicate(s -> s.equals("public")));
-		
+
 		TreeDiff diff = TreeDiff.compare(zolaGenTree, zolaServeTree);
-		
+
 		var dirsToDelete = new ArrayList<Path>();
 		for(var result : diff.results.values())
 		{
@@ -122,36 +122,48 @@ public class Zola
 		{
 			Files.delete(path);
 		}
-		
+	}
+
+	public static void serveSite(Map<String, LocalRepository> builtRepositories) throws Exception
+	{
+		prepareZolaInputs(builtRepositories);
+
+		Path site = Path.of(Prefs.get(Prefs.SITE_PATH));
+		Path siteZola = site.resolve("zola");
+		Path build = site.resolve("build");
+		Path buildZola = build.resolve("zola-stage");
+		Path buildZolaFinal = build.resolve("zola");
+		Path zolaExe = Path.of(Prefs.get(Prefs.ZOLA_BIN));
+
 		if(!serving)
 		{
 			serving = true;
-			
+
 			ProcessBuilder pb = new ProcessBuilder(zolaExe.toString(), "serve");
 			pb.directory(buildZolaFinal.toFile());
 			pb.redirectOutput(Redirect.INHERIT);
 			pb.redirectError(Redirect.INHERIT);
 			pb.start();
-			
+
 			if(!liveTrees.containsKey("site"))
 			{
 				liveTrees.put("site", IndexedFileTree.load(siteZola, buildZola.resolveSibling("indices").resolve("zola-site.index")));
 			}
-			
+
 			new Timer("Tree-Watcher").schedule(new TimerTask(){
 
 				@Override
 				public void run()
 				{
 					boolean newChanges = false;
-					
+
 					try
 					{
 //						var pathEntries = livePaths.entrySet().iterator();
 //						while(pathEntries.hasNext())
 //						{
 //							var pathEntry = pathEntries.next();
-//							
+//
 //							if(Files.exists(pathEntry.getValue()))
 //							{
 //								Path indexPath = buildZola.resolveSibling("indices").resolve(pathEntry.getKey() + "-docs.index");
@@ -161,7 +173,7 @@ public class Zola
 //								newChanges = true;
 //							}
 //						}
-						
+
 						for(var tree : liveTrees.values())
 						{
 							String hash = tree.get("").getHash();
@@ -171,10 +183,10 @@ public class Zola
 								newChanges = true;
 							}
 						}
-						
+
 						if(newChanges)
 						{
-							buildSite();
+							prepareZolaInputs(builtRepositories);
 						}
 					}
 					catch(Exception ex)
@@ -182,17 +194,35 @@ public class Zola
 						log.error(ex.getMessage(), ex);
 					}
 				}
-				
+
 			}, 500, 500);
 		}
+	}
+
+	public static void buildSite(Map<String, LocalRepository> builtRepositories) throws Exception
+	{
+		log.info("Build site");
+
+		prepareZolaInputs(builtRepositories);
+
+		Path site = Path.of(Prefs.get(Prefs.SITE_PATH));
+		Path build = site.resolve("build");
+		Path buildZolaFinal = build.resolve("zola");
+		Path zolaExe = Path.of(Prefs.get(Prefs.ZOLA_BIN));
+
+		ProcessBuilder pb = new ProcessBuilder(zolaExe.toString(), "build");
+		pb.directory(buildZolaFinal.toFile());
+		pb.redirectOutput(Redirect.INHERIT);
+		pb.redirectError(Redirect.INHERIT);
+		pb.start();
 	}
 	
 	private static Map<String, IndexedFileTree> liveTrees = new HashMap<>();
 //	private static Map<String, Path> livePaths = new HashMap<>();
 	
-	private static void buildCategory(ExtensionRepository repo, Path buildZola) throws Exception
+	private static void buildCategory(LocalRepository repo, Path buildZola) throws Exception
 	{
-		String repoId = StringUtils.substringAfterLast(repo.url, "/");
+		String repoId = StringUtils.substringAfterLast(repo.getUrl(), "/");
 
 		Map<String, PackageEntry> pkgEntries = new HashMap<>();
 		for(var pkgEntry : repo.getManifest().entries())
@@ -201,31 +231,8 @@ public class Zola
 		}
 
 		buildCategoryIndex(repoId, buildZola);
-		for(var extension : repo.getExtensions().values())
+		for(var extension : repo.getPackages().values())
 		{
-			String oldCat = extension.cat == ExtensionCategory.GAME ? "engine" : "toolset";
-			String newCat = "extension";
-			String category = newCat;
-
-			String oldApi = "v3";
-			String newApi = "v4";
-			String apiV = newApi;
-
-			Path extensionPath = Path.of(category, extension.id);
-			Path extSourceData = Sources.getSources().get(repo.url).sources().get(extension.id).getPath();
-			Path extBuildData = buildZola.resolve(DATA).resolve(repoId).resolve(extensionPath);
-			Path extBuildStatic = buildZola.resolve(STATIC).resolve(repoId).resolve(apiV).resolve(extensionPath);
-			
-			String iconFile = "icon.png";
-			
-			Files.createDirectories(extBuildData);
-			Files.createDirectories(extBuildStatic);
-			
-			Path iconSource = extSourceData.resolve(iconFile);
-			Path iconTarget = extBuildStatic.resolve(iconFile);
-			
-			if(Files.exists(iconSource)) Files.copy(iconSource, iconTarget, StandardCopyOption.REPLACE_EXISTING);
-			
 			buildDocsForExtension(extension, pkgEntries.get(extension.id), repoId, buildZola);
 		}
 	}
@@ -243,15 +250,12 @@ public class Zola
 						+++
 						title = "${title}"
 						template = "category-landing.html"
-						
-						[extra]
-						data_path = "data/${repo}/extension"
 						+++
 						""";
 		
 		output = StrSubstitutor.replace(output, replacements);
 
-		Path categoryIndex = buildZola.resolve(CONTENT).resolve(repoId, "extension", "_index.md");
+		Path categoryIndex = buildZola.resolve(CONTENT).resolve(repoId, "extensions", "_index.md");
 		Files.createDirectories(categoryIndex.getParent());
 		Files.writeString(categoryIndex, output.toString());
 	}
@@ -324,8 +328,12 @@ public class Zola
 		Path docsSource = extensionSource.resolve("site");
 
 		String oldCat = ext.cat == ExtensionCategory.GAME ? "engine" : "toolset";
-		String newCat = "extension";
+		String newCat = "extensions";
 		String category = newCat;
+
+//		String oldApi = "v3";
+//		String newApi = "v4";
+//		String apiV = newApi;
 
 		Path extensionOutputFolder = buildZola.resolve(CONTENT, repoId, category, ext.id);
 		Files.createDirectories(extensionOutputFolder);
@@ -341,6 +349,7 @@ public class Zola
 				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException
 				{
 					Files.createDirectories(extensionOutputFolder.resolve(docsSource.relativize(dir)));
+					System.out.println("create " + extensionOutputFolder.resolve(docsSource.relativize(dir)));
 					
 					Path indexFile = dir.resolve("index.md");
 					if(Files.exists(indexFile)) return FileVisitResult.CONTINUE;
@@ -360,6 +369,7 @@ public class Zola
 					
 					Path indexTarget = extensionOutputFolder.resolve(docsSource.relativize(indexFile));
 					Files.writeString(indexTarget, output.toString());
+					System.out.println("write " + extensionOutputFolder.resolve(docsSource.relativize(indexFile)));
 					
 					return FileVisitResult.CONTINUE;
 				}
@@ -376,6 +386,7 @@ public class Zola
 								(fm, content, sb) -> writeInstallationDocument(fm, content, sb, ext));
 						
 						Files.writeString(writeTo, installPage);
+						System.out.println("write " + writeTo);
 						wroteInstallInstructions.setTrue();
 					}
 					else if(relative.equals("_index.md"))
@@ -384,6 +395,7 @@ public class Zola
 								(fm, content, sb) -> processLandingPage(fm, content, sb, ext));
 						
 						Files.writeString(writeTo, landingPage);
+						System.out.println("write " + writeTo);
 						wroteLandingPage.setTrue();
 					}
 					else if(relative.equals("_sidebar.md"))
@@ -392,11 +404,13 @@ public class Zola
 								(fm, content, sb) -> processSidebarPage(fm, content, sb, docsSource));
 						
 						Files.writeString(writeTo, sidebarPage);
+						System.out.println("write " + writeTo);
 						wroteSidebarPage.setTrue();
 					}
 					else
 					{
 						Files.copy(file, writeTo, StandardCopyOption.REPLACE_EXISTING);
+						System.out.println("copy to " + writeTo);
 					}
 					
 					return FileVisitResult.CONTINUE;
@@ -452,6 +466,7 @@ public class Zola
 
 		Path extensionVersionsMd = extensionOutputFolder.resolve("versions.md");
 		Files.writeString(extensionVersionsMd, output.toString());
+		System.out.println("write " + extensionVersionsMd);
 		
 		if(wroteLandingPage.isFalse())
 		{
@@ -459,6 +474,7 @@ public class Zola
 			processLandingPage(null, "", sb, ext);
 			Path extensionLandingMd = extensionOutputFolder.resolve("_index.md");
 			Files.writeString(extensionLandingMd, sb.toString());
+			System.out.println("write " + extensionLandingMd);
 		}
 		
 		if(wroteInstallInstructions.isFalse())
@@ -467,6 +483,7 @@ public class Zola
 			writeInstallationDocument(null, "", sb, ext);
 			Path extensionInstallationMd = extensionOutputFolder.resolve("install.md");
 			Files.writeString(extensionInstallationMd, sb.toString());
+			System.out.println("write " + extensionInstallationMd);
 		}
 		
 		if(wroteSidebarPage.isFalse())
@@ -476,6 +493,7 @@ public class Zola
 			output.append("+++\n");
 			
 			Files.writeString(extensionOutputFolder.resolve("_sidebar.md"), output.toString());
+			System.out.println("write " + extensionOutputFolder.resolve("_sidebar.md"));
 		}
 		
 		String extensionKey = extensionSource.getParent().getParent()
@@ -509,8 +527,7 @@ public class Zola
 		sb.append("page_template = \"extension-guide.html\"\n\n");
 		
 		sb.append("[extra]\n");
-		sb.append("data_path = \"data/"+repoId+"/extension/").append(ext.id).append("\"\n\n");
-		sb.append("base_url = \"/"+repoId+"/v4/extension/").append(ext.id).append("\"\n\n");
+		sb.append("base_url = \"/"+repoId+"/v4/extensions/").append(ext.id).append("\"\n\n");
 		sb.append("extension_id = \"").append(ext.id).append("\"\n");
 		sb.append("extension_name = \"").append(ext.name).append("\"\n");
 		sb.append("extension_description = \"").append(ext.description).append("\"\n");
