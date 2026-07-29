@@ -490,6 +490,9 @@ public class Zola
 		{
 			output = new StringBuilder();
 			output.append("+++\n");
+			output
+					.append("[extra]\n")
+					.append("exclude_from_sitemap = true\n\n");
 			output.append("+++\n");
 			
 			Files.writeString(extensionOutputFolder.resolve("_sidebar.md"), output.toString());
@@ -594,6 +597,10 @@ public class Zola
 	private static void processSidebarPage(TomlParseResult frontmatter, String content, StringBuilder sb, Path docsSource)
 	{
 		sb.append("+++\n\n");
+
+		sb
+			.append("[extra]\n")
+			.append("exclude_from_sitemap = true\n\n");
 		
 		List<String> lines = readAllLines(content);
 		Map<String, List<SidebarLink>> links = new LinkedHashMap<>();
