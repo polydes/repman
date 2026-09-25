@@ -238,7 +238,7 @@ public class ExtensionView extends JPanel implements TreeSelectionListener
 		{
 			try
 			{
-				netChanges = ExtensionInfo.readChanges(mirrorPath);
+				netChanges = ExtensionInfo.readChanges(mirrorPath.resolve("changes.md"));
 			}
 			catch (IOException e)
 			{

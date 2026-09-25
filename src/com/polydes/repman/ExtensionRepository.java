@@ -76,17 +76,17 @@ public class ExtensionRepository
 
 	public Path getExtensionLocalLocation(String extensionID)
 	{
-		return cachePath.resolve(extensionID);
+		return cachePath.resolve("extensions", extensionID);
 	}
 	
 	public Path getVersionLocalLocation(String extensionID, Version v)
 	{
-		return cachePath.resolve(extensionID, v + ".zip");
+		return cachePath.resolve("extensions", extensionID, v + ".zip");
 	}
 	
 	public boolean hasVersionLocally(NetExtension ext, Version v)
 	{
-		return Files.exists(cachePath.resolve(ext.id, v + ".zip"));
+		return Files.exists(cachePath.resolve("extensions", ext.id, v + ".zip"));
 	}
 	
 	public void setHasVersionLocally(NetExtension ext, Version v, boolean value, Runnable callback)
@@ -94,7 +94,7 @@ public class ExtensionRepository
 		if(value == hasVersionLocally(ext, v))
 			return;
 
-		Path location = cachePath.resolve(ext.id, v + ".zip");
+		Path location = cachePath.resolve("extensions", ext.id, v + ".zip");
 		
 		if(value)
 		{
