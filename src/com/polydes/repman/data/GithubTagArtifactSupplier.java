@@ -35,11 +35,14 @@ public class GithubTagArtifactSupplier implements ArtifactSupplier
     @Override
     public ArtifactEntry getArtifact(Version version) {
         String versionString = version.toString();
-        boolean inLocal = localTags.contains(versionString) || localTags.contains("v" + versionString);
-
-        if(inLocal)
+        if(localTags.contains(versionString))
         {
             String url = String.format(remoteTaggedArtifactsUrl, versionString);
+            return new ArtifactEntry(versionString, url);
+        }
+        else if(localTags.contains("v" + versionString))
+        {
+            String url = String.format(remoteTaggedArtifactsUrl, "v" + versionString);
             return new ArtifactEntry(versionString, url);
         }
 
